@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graphexosuitcli"
+version = "0.1.0"
+description = "Typer CLI for graphexosuit LangGraph workflows"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "graphexosuit>=0.1.0",
+    "typer>=0.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+graphexosuit = "graphexosuitcli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["graphexosuitcli*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
