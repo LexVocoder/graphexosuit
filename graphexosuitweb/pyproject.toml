@@ -23,7 +23,7 @@ dev = [
 ]
 
 [project.scripts]
-graphexosuitweb = "graphexosuitweb.app:app"
+graphexosuitweb = "graphexosuitweb._server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
