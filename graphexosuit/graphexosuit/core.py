@@ -71,10 +71,6 @@ def _validate_run_result(result: RunResult) -> None:
                 "RunResult: completed=True is incompatible with paused=True"
             )
     elif result.paused:
-        if result.completed:
-            raise ValueError(
-                "RunResult: paused=True is incompatible with completed=True"
-            )
         if result.interrupt_value is None:
             raise ValueError(
                 "RunResult: paused=True requires interrupt_value to be set"
