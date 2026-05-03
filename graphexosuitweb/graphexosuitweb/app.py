@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
+from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Optional
 
@@ -12,11 +12,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from graphexosuit import ExosuitCore, ResumeValue, load_liner
-
-app = FastAPI(
-    title="graphexosuitweb",
-    description="HTTP interface for executing LangGraph workflows via graphexosuit.",
-)
 
 # --------------------------------------------------------------------------
 # Lazily initialise the ExosuitCore from the environment variable.
@@ -33,6 +28,24 @@ def _get_core() -> ExosuitCore:
         liner = load_liner()
         _core = ExosuitCore(liner)
     return _core
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan: startup and shutdown."""
+    # Startup
+    yield
+    # Shutdown
+    global _core
+    if _core is not None:
+        _core.close()
+
+
+app = FastAPI(
+    title="graphexosuitweb",
+    description="HTTP interface for executing LangGraph workflows via graphexosuit.",
+    lifespan=lifespan,
+)
 
 
 def _result_response(result) -> JSONResponse:
