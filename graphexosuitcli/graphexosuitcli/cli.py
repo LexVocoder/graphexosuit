@@ -1,13 +1,15 @@
+#!/usr/bin/env -S uv run
+
 """Typer CLI for graphexosuit."""
 
 from __future__ import annotations
 
 import json
-import sys
+import typer
 from dataclasses import asdict
+from graphexosuit import ExosuitCore, load_graph_and_checkpointer, ResumeValue
 from typing import Optional
 
-import typer
 
 app = typer.Typer(
     name="graphexosuit",
@@ -18,7 +20,6 @@ app = typer.Typer(
 
 def _load_core():
     """Load graph, checkpointer, and return an ExosuitCore instance."""
-    from graphexosuit import ExosuitCore, load_graph_and_checkpointer
 
     state_graph, checkpointer = load_graph_and_checkpointer()
     return ExosuitCore(state_graph, checkpointer)
@@ -65,8 +66,6 @@ def resume(
         except json.JSONDecodeError as exc:
             typer.echo(f"Invalid JSON for --payload: {exc}", err=True)
             raise typer.Exit(code=1)
-
-    from graphexosuit import ResumeValue
 
     core = _load_core()
     resume_value = ResumeValue(id=resume_id, payload=payload_data)
