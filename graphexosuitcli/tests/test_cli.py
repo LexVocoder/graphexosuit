@@ -78,8 +78,10 @@ runner = CliRunner()
 
 
 def _parse_json(output: str) -> dict:
-    """Extract the first JSON line from CLI output (stderr may follow)."""
-    return json.loads(output.strip().split("\n")[0])
+    """Extract JSON from CLI output (supports multi-line formatted JSON)."""
+    decoder = json.JSONDecoder()
+    obj, _ = decoder.raw_decode(output.strip())
+    return obj
 
 
 def _env():
