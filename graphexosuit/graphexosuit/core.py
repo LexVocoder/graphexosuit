@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import traceback
 import uuid
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from langgraph.types import Command
 from typing import Any, Optional
@@ -132,8 +133,24 @@ class ExosuitCore:
     def __init__(self, liner: Any) -> None:
         self._liner = liner
         state_graph = liner.get_graph()
-        checkpointer = liner.get_checkpointer()
+        
+        # Use ExitStack to manage the checkpointer context manager lifecycle
+        self._exit_stack = ExitStack()
+        checkpointer_cm = liner.get_checkpointer()
+        checkpointer = self._exit_stack.enter_context(checkpointer_cm)
+        
         self._graph_app = state_graph.compile(checkpointer=checkpointer)
+
+    def close(self) -> None:
+        """Close and cleanup the checkpointer context manager."""
+        self._exit_stack.close()
+
+    def __del__(self) -> None:
+        """Ensure cleanup on garbage collection."""
+        try:
+            self.close()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Internal helpers
