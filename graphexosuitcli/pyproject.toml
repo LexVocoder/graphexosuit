@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "graphexosuitcli"
 version = "0.1.0"
@@ -14,17 +10,13 @@ dependencies = [
     "typer>=0.9.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest>=7.0",
 ]
 
 [project.scripts]
 graphexosuit = "graphexosuitcli.cli:main"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["graphexosuitcli*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
