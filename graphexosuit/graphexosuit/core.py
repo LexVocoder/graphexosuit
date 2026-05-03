@@ -6,6 +6,7 @@ import sys
 import traceback
 import uuid
 from dataclasses import dataclass, field
+from langgraph.types import Command
 from typing import Any, Optional
 
 
@@ -29,7 +30,7 @@ class StandardizedInterrupt:
     """
 
     message: str
-    options: list
+    options: list[InterruptOption]
 
 
 @dataclass
@@ -49,11 +50,11 @@ class RunResult:
 
     completed: bool
     thread_id: str
-    result: Optional[dict] = None
-    paused: bool = False
-    interrupt_value: Optional[Any] = None
-    error: Optional[str] = None
     checkpoint_id: Optional[str] = None
+    error: Optional[str] = None
+    interrupt_value: Optional[Any] = None
+    paused: bool = False
+    result: Optional[dict] = None
 
     def __post_init__(self) -> None:
         _validate_run_result(self)
@@ -133,7 +134,7 @@ class ExosuitCore:
     """
 
     def __init__(self, state_graph: Any, checkpointer: Any) -> None:
-        self._graph = state_graph.compile(checkpointer=checkpointer)
+        self._graph_app = state_graph.compile(checkpointer=checkpointer)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -144,11 +145,11 @@ class ExosuitCore:
         thread_id: str = config["configurable"]["thread_id"]
 
         try:
-            output = self._graph.invoke(input_data, config=config)
+            output = self._graph_app.invoke(input_data, config=config)
         except Exception as exc:
             # Log full traceback to stderr for operational debugging
             traceback.print_exc(file=sys.stderr)
-            checkpoint_id = _extract_checkpoint_id(self._graph, config)
+            checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
             return RunResult(
                 completed=False,
                 thread_id=thread_id,
@@ -164,7 +165,7 @@ class ExosuitCore:
             try:
                 _validate_interrupt_value(interrupt_obj)
             except ValueError as exc:
-                checkpoint_id = _extract_checkpoint_id(self._graph, config)
+                checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
                 return RunResult(
                     completed=False,
                     thread_id=thread_id,
@@ -173,7 +174,7 @@ class ExosuitCore:
                     paused=False,
                 )
 
-            checkpoint_id = _extract_checkpoint_id(self._graph, config)
+            checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
             return RunResult(
                 completed=False,
                 thread_id=thread_id,
@@ -237,8 +238,6 @@ class ExosuitCore:
                 error=str(exc),
             )
 
-        from langgraph.types import Command  # lazy import to keep deps minimal
-
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -257,7 +256,6 @@ class ExosuitCore:
         checkpoint_id:
             Checkpoint at which the failure occurred.
         """
-        from langgraph.types import Command  # lazy import
 
         config = {
             "configurable": {
@@ -266,7 +264,7 @@ class ExosuitCore:
             }
         }
         try:
-            state_snapshot = self._graph.get_state(config)
+            state_snapshot = self._graph_app.get_state(config)
             if not state_snapshot.next:
                 return RunResult(
                     completed=False,
