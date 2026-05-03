@@ -9,6 +9,7 @@ from typing import Any, TypedDict
 
 from typer.testing import CliRunner
 
+from graphexosuit.liner import Liner
 from graphexosuitcli.cli import app
 
 
@@ -65,7 +66,7 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
-class _TestLiner:
+class _TestLiner(Liner):
     """Liner-compatible class for testing."""
 
     def get_graph(self) -> Any:

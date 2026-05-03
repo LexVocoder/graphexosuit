@@ -13,7 +13,10 @@ from graphexosuit.liner import Liner
 # Graph nodes
 
 def initialize(state):
-    """Standard initialization node that ensures entire initial state is captured in the first checkpoint, making it available for resuming and retrying even if the graph fails or is interrupted immediately."""
+    """Standard initialization node that ensures entire initial state is both valid and captured in the first checkpoint, making it available for resuming and retrying even if the graph fails or is interrupted immediately thereafter."""
+    if not hasattr(state, "value"):
+        raise ValueError("Initial state must have 'value' key")
+
     return state
 
 def node(state):
@@ -64,7 +67,7 @@ class SimpleLiner(Liner):
     def get_checkpointer(self):
         return SqliteSaver.from_conn_string(self._get_checkpoint_db_path())
 
-    def transform_result(self, result: RunResult) -> RunResult:
+    def transform_run_result(self, result: RunResult) -> RunResult:
         if result.completed:
             # Delete cache folder and all contents upon *successful* completion.
             # If we delete it on failure or interrupt, we won't be able to resume or retry.

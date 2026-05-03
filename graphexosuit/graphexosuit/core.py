@@ -52,7 +52,7 @@ class RunResult:
     thread_id: str
     checkpoint_id: Optional[str] = None
     error: Optional[str] = None
-    interrupt_value: Optional[Any] = None
+    interrupt_value: Optional[StandardizedInterrupt] = None
     paused: bool = False
     result: Optional[dict] = None
 
@@ -139,6 +139,53 @@ class ExosuitCore:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    def _build_run_result(
+            self,
+            completed: bool,
+            thread_id: str,
+            checkpoint_id: Optional[str] = None,
+            error: Optional[str] = None,
+            interrupt_value: Optional[StandardizedInterrupt] = None,
+            paused: bool = False,
+            result: Optional[dict] = None,
+    ) -> RunResult:
+        """Helper to construct a RunResult with optional transformation & validation."""
+        run_result = RunResult(
+            completed=completed,
+            thread_id=thread_id,
+            checkpoint_id=checkpoint_id,
+            error=error,
+            interrupt_value=interrupt_value,
+            paused=paused,
+            result=result,
+        )
+
+        if hasattr(self._liner, "transform_run_result"):
+            run_result = self._liner.transform_run_result(run_result)
+
+        _validate_run_result(run_result)
+        return run_result
+
+    def _log_and_create_error_result(
+            self,
+            exc: Exception,
+            thread_id: str,
+            error_prefix: Optional[str] = None,
+            checkpoint_id: Optional[str] = None,
+    ) -> RunResult:
+
+        traceback.print_exception(exc, file=sys.stderr)
+
+        run_result = self._build_run_result(
+                completed=False,
+                thread_id=thread_id,
+                checkpoint_id=checkpoint_id,
+                error=f"{error_prefix}: {exc}" if error_prefix else str(exc),
+                paused=False,
+            )
+
+        return run_result
+
     def _invoke(self, initial_state: Any, config: dict) -> RunResult:
         """Invoke the graph and return a RunResult, handling pauses and errors."""
         thread_id: str = config["configurable"]["thread_id"]
@@ -146,15 +193,13 @@ class ExosuitCore:
         try:
             output = self._graph_app.invoke(initial_state, config=config)
         except Exception as exc:
-            # Log full traceback to stderr for operational debugging
-            traceback.print_exc(file=sys.stderr)
+            # An error occurred during graph execution. It could be anything.
             checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
-            return RunResult(
-                completed=False,
+            return self._log_and_create_error_result(
+                exc=exc,
                 thread_id=thread_id,
-                error=str(exc),
+                error_prefix="Error during graph execution",
                 checkpoint_id=checkpoint_id,
-                paused=False,
             )
 
         # LangGraph signals an interrupt by including __interrupt__ in the output
@@ -164,18 +209,16 @@ class ExosuitCore:
             try:
                 _validate_interrupt_value(interrupt_obj)
             except ValueError as exc:
-                traceback.print_exc(file=sys.stderr)
                 checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
-                return RunResult(
-                    completed=False,
+                return self._log_and_create_error_result(
+                    exc=exc,
                     thread_id=thread_id,
-                    error=str(exc),
+                    error_prefix=f"Graph returned an invalid interrupt value",
                     checkpoint_id=checkpoint_id,
-                    paused=False,
                 )
 
             checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
-            return RunResult(
+            return self._build_run_result(
                 completed=False,
                 thread_id=thread_id,
                 paused=True,
@@ -183,7 +226,7 @@ class ExosuitCore:
                 checkpoint_id=checkpoint_id,
             )
 
-        return RunResult(
+        return self._build_run_result(
             completed=True,
             thread_id=thread_id,
             result=output if isinstance(output, dict) else {"output": output},
@@ -210,6 +253,10 @@ class ExosuitCore:
         if thread_id is None:
             thread_id = str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}}
+
+        if hasattr(self._liner, "transform_initial_state"):
+            initial_state = self._liner.transform_initial_state(initial_state)
+
         return self._invoke(initial_state, config)
 
     def resume(
@@ -229,15 +276,31 @@ class ExosuitCore:
         resume_value:
             Duck-typed ResumeValue with ``.id`` and ``.payload`` attributes.
         """
+
         try:
             _validate_resume_value(resume_value)
         except ValueError as exc:
-            traceback.print_exc(file=sys.stderr)
-            return RunResult(
+            # Client did not provide a well-formed resume value.
+            # Don't log stack trace to stderr, because it's a client error.
+            return self._build_run_result(
                 completed=False,
+                error=f"Given resume value is not well-formed: {exc}",
                 thread_id=thread_id,
-                error=str(exc),
+                checkpoint_id=checkpoint_id,
             )
+
+        if hasattr(self._liner, "transform_resume_value"):
+            resume_value = self._liner.transform_resume_value(resume_value)
+            try:
+                _validate_resume_value(resume_value)
+            except ValueError as exc:
+                # Transformed resume value is not well-formed.
+                return self._log_and_create_error_result(
+                    exc=exc,
+                    thread_id=thread_id,
+                    error_prefix=f"Transformed resume value is not well-formed, but original resume value was valid",
+                    checkpoint_id=checkpoint_id,
+                )
 
         config = {
             "configurable": {
@@ -258,6 +321,17 @@ class ExosuitCore:
             Checkpoint at which the failure occurred.
         """
 
+        if hasattr(self._liner, "on_retry"):
+            try:
+                self._liner.on_retry(thread_id=thread_id, checkpoint_id=checkpoint_id)
+            except Exception as exc:
+                return self._log_and_create_error_result(
+                    exc=exc,
+                    thread_id=thread_id,
+                    error_prefix="Error in liner's on_retry hook",
+                    checkpoint_id=checkpoint_id,
+                )
+
         config = {
             "configurable": {
                 "thread_id": thread_id,
@@ -267,18 +341,20 @@ class ExosuitCore:
         try:
             state_snapshot = self._graph_app.get_state(config)
             if not state_snapshot.next:
-                return RunResult(
+                # There is no exception to log, so build a full run result.
+                return self._build_run_result(
                     completed=False,
                     thread_id=thread_id,
+                    checkpoint_id=checkpoint_id,
                     error="No failed node found in state snapshot to retry",
                 )
             failed_node = state_snapshot.next[0]
         except Exception as exc:
-            traceback.print_exc(file=sys.stderr)
-            return RunResult(
-                completed=False,
+            return self._log_and_create_error_result(
+                exc=exc,
                 thread_id=thread_id,
-                error=str(exc),
+                error_prefix="Error retrieving state snapshot for retry",
+                checkpoint_id=checkpoint_id,
             )
 
         return self._invoke(Command(goto=failed_node), config)

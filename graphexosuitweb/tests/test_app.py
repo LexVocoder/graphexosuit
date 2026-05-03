@@ -9,6 +9,8 @@ from typing import Any, TypedDict
 import pytest
 from httpx import AsyncClient, ASGITransport
 
+from graphexosuit.liner import Liner
+
 
 # ---------------------------------------------------------------------------
 # Fixture: minimal in-process graph module with Liner-compatible class
@@ -59,7 +61,7 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
-class _TestLiner:
+class _TestLiner(Liner):
     """Liner-compatible class for testing."""
 
     def get_graph(self) -> Any:
