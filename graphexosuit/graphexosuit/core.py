@@ -110,12 +110,9 @@ def _validate_resume_value(value: Any) -> None:
 
 
 def _extract_checkpoint_id(graph: Any, config: dict) -> Optional[str]:
-    """Return the latest checkpoint ID from the graph state, or None."""
-    try:
-        state = graph.get_state(config)
-        return state.config["configurable"].get("checkpoint_id")
-    except Exception:
-        return None
+    """Return the latest checkpoint ID from the graph state."""
+    state = graph.get_state(config)
+    return state.config["configurable"].get("checkpoint_id")
 
 
 class ExosuitCore:
@@ -165,6 +162,7 @@ class ExosuitCore:
             try:
                 _validate_interrupt_value(interrupt_obj)
             except ValueError as exc:
+                traceback.print_exc(file=sys.stderr)
                 checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
                 return RunResult(
                     completed=False,
@@ -232,6 +230,7 @@ class ExosuitCore:
         try:
             _validate_resume_value(resume_value)
         except ValueError as exc:
+            traceback.print_exc(file=sys.stderr)
             return RunResult(
                 completed=False,
                 thread_id=thread_id,
