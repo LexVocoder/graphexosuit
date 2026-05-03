@@ -68,8 +68,8 @@ def _get_checkpointer():
 # Register fake module on sys.modules so graph_loader can import it
 _FAKE_MODULE = "fake_graph_module"
 _fake_mod = _types.ModuleType(_FAKE_MODULE)
-_fake_mod.get_graph = _get_graph
-_fake_mod.get_checkpointer = _get_checkpointer
+setattr(_fake_mod, "get_graph", _get_graph)
+setattr(_fake_mod, "get_checkpointer", _get_checkpointer)
 sys.modules[_FAKE_MODULE] = _fake_mod
 
 
