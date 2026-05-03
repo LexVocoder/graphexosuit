@@ -7,6 +7,7 @@ import traceback
 import uuid
 from contextlib import ExitStack
 from dataclasses import dataclass, field
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.types import Command
 from typing import Any, Optional
 
@@ -138,6 +139,15 @@ class ExosuitCore:
         self._exit_stack = ExitStack()
         checkpointer_cm = liner.get_checkpointer()
         checkpointer = self._exit_stack.enter_context(checkpointer_cm)
+        
+        # Register graphexosuit types with the serializer to prevent deserialization warnings
+        checkpointer.serde = JsonPlusSerializer(
+            allowed_msgpack_modules=[
+                ("graphexosuit.core", "ResumeValue"),
+                ("graphexosuit.core", "InterruptOption"),
+                ("graphexosuit.core", "StandardizedInterrupt"),
+            ]
+        )
         
         self._graph_app = state_graph.compile(checkpointer=checkpointer)
 
