@@ -39,13 +39,13 @@ def run(
 ) -> None:
     """Run the graph from the beginning."""
     try:
-        input_data = json.loads(input)
+        initial_state = json.loads(input)
     except json.JSONDecodeError as exc:
         typer.echo(f"Invalid JSON for --input: {exc}", err=True)
         raise typer.Exit(code=1)
 
     core = _load_core()
-    result = core.run(input_data, thread_id=thread_id)
+    result = core.run(initial_state, thread_id=thread_id)
     _print_result(result)
 
 

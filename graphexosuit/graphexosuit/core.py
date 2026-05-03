@@ -137,12 +137,12 @@ class ExosuitCore:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _invoke(self, input_data: Any, config: dict) -> RunResult:
+    def _invoke(self, initial_state: Any, config: dict) -> RunResult:
         """Invoke the graph and return a RunResult, handling pauses and errors."""
         thread_id: str = config["configurable"]["thread_id"]
 
         try:
-            output = self._graph_app.invoke(input_data, config=config)
+            output = self._graph_app.invoke(initial_state, config=config)
         except Exception as exc:
             # Log full traceback to stderr for operational debugging
             traceback.print_exc(file=sys.stderr)
@@ -193,14 +193,14 @@ class ExosuitCore:
 
     def run(
         self,
-        input_data: dict,
+        initial_state: dict,
         thread_id: Optional[str] = None,
     ) -> RunResult:
         """Execute the graph from the beginning.
 
         Parameters
         ----------
-        input_data:
+        initial_state:
             Initial state passed to the graph.
         thread_id:
             Optional identifier.  A UUID is generated when omitted.
@@ -208,7 +208,7 @@ class ExosuitCore:
         if thread_id is None:
             thread_id = str(uuid.uuid4())
         config = {"configurable": {"thread_id": thread_id}}
-        return self._invoke(input_data, config)
+        return self._invoke(initial_state, config)
 
     def resume(
         self,
