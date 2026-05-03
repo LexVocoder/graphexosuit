@@ -5,10 +5,13 @@
 from __future__ import annotations
 
 import json
+import sys
 import typer
 from dataclasses import asdict
-from graphexosuit import ExosuitCore, load_liner, ResumeValue
 from typing import Optional
+
+from graphexosuit import ExosuitCore, load_liner, ResumeValue
+from graphexosuit.core import RunResult
 
 
 app = typer.Typer(
@@ -28,6 +31,28 @@ def _print_result(result) -> None:
     """Serialize a RunResult to JSON and print it to stdout."""
     print(json.dumps(asdict(result), default=str, indent=2))
 
+def _print_tips_to_stderr(result: RunResult) -> None:
+    """Print re-execution tips to stderr if the graph execution did not complete."""
+    if result.completed:
+        return
+
+    tip = ""
+    if result.paused and result.interrupt_value is not None:
+        tip += "Graph execution paused. To resume, run:\n"
+        tip += f"  cli.py resume "
+        tip += f"--thread-id {result.thread_id} "
+        tip += f"--checkpoint-id {result.checkpoint_id} "
+        tip += f"--resume-id '{'/'.join(option.id for option in result.interrupt_value.options)}' "
+        tip += f"--payload '{'/'.join(json.dumps(option.payload) if option.payload is not None else '{}' for option in result.interrupt_value.options)}'"
+    elif result.error:
+        tip += "Graph execution failed. To retry, run:\n"
+        tip += f"  cli.py retry "
+        tip += f"--thread-id {result.thread_id} "
+        tip += f"--checkpoint-id {result.checkpoint_id}"
+    # else we got no tips
+
+    if tip:
+        print(tip, file=sys.stderr)
 
 @app.command()
 def run(
@@ -44,8 +69,12 @@ def run(
         raise typer.Exit(code=1)
 
     core = _load_core()
-    result = core.run(initial_state, thread_id=thread_id)
-    _print_result(result)
+    try:
+        result = core.run(initial_state, thread_id=thread_id)
+        _print_result(result)
+        _print_tips_to_stderr(result)
+    finally:
+        core.close()
 
 
 @app.command()
@@ -67,9 +96,13 @@ def resume(
             raise typer.Exit(code=1)
 
     core = _load_core()
-    resume_value = ResumeValue(id=resume_id, payload=payload_data)
-    result = core.resume(thread_id, checkpoint_id, resume_value)
-    _print_result(result)
+    try:
+        resume_value = ResumeValue(id=resume_id, payload=payload_data)
+        result = core.resume(thread_id, checkpoint_id, resume_value)
+        _print_result(result)
+        _print_tips_to_stderr(result)
+    finally:
+        core.close()
 
 
 @app.command()
@@ -79,8 +112,12 @@ def retry(
 ) -> None:
     """Retry the failed node of a graph execution."""
     core = _load_core()
-    result = core.retry(thread_id, checkpoint_id)
-    _print_result(result)
+    try:
+        result = core.retry(thread_id, checkpoint_id)
+        _print_result(result)
+        _print_tips_to_stderr(result)
+    finally:
+        core.close()
 
 
 def main() -> None:
