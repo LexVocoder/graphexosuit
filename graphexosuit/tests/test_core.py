@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from typing import TypedDict
+from typing import Any, TypedDict
 from unittest.mock import MagicMock
 
 from langgraph.graph import StateGraph, END
@@ -20,6 +20,7 @@ from graphexosuit.core import (
     _validate_interrupt_value,
     _validate_resume_value,
 )
+from graphexosuit.liner import Liner
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +81,14 @@ def _error_graph() -> StateGraph:
 
 
 def _make_core(graph_fn) -> ExosuitCore:
-    return ExosuitCore(graph_fn(), MemorySaver())
+    class TestLiner(Liner):
+        def get_graph(self) -> StateGraph:
+            return graph_fn()
+
+        def get_checkpointer(self) -> Any:
+            return MemorySaver()
+
+    return ExosuitCore(TestLiner())
 
 
 # ---------------------------------------------------------------------------
@@ -273,12 +281,19 @@ class TestExosuitCoreRetry:
 
 class TestExosuitCoreCompile:
     def test_accepts_uncompiled_graph(self):
-        """ExosuitCore must accept an uncompiled StateGraph and compile it."""
+        """ExosuitCore must accept a Liner instance with uncompiled graph."""
         uncompiled = _simple_graph()
         # Should NOT be a CompiledStateGraph yet
         from langgraph.graph.state import CompiledStateGraph
         assert not isinstance(uncompiled, CompiledStateGraph)
 
-        core = ExosuitCore(uncompiled, MemorySaver())
+        class TestLiner(Liner):
+            def get_graph(self) -> StateGraph:
+                return uncompiled
+
+            def get_checkpointer(self) -> Any:
+                return MemorySaver()
+
+        core = ExosuitCore(TestLiner())
         result = core.run({"value": "test"})
         assert result.completed

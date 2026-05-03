@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import sys
 import types as _types
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import pytest
 from httpx import AsyncClient, ASGITransport
 
 
 # ---------------------------------------------------------------------------
-# Fixture: minimal in-process graph module
+# Fixture: minimal in-process graph module with Liner-compatible class
 # ---------------------------------------------------------------------------
 
 class _State(TypedDict):
@@ -59,10 +59,19 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
+class _TestLiner:
+    """Liner-compatible class for testing."""
+
+    def get_graph(self) -> Any:
+        return _get_graph()
+
+    def get_checkpointer(self) -> Any:
+        return _get_checkpointer()
+
+
 _FAKE_MODULE = "fake_web_graph_module"
 _fake_mod = _types.ModuleType(_FAKE_MODULE)
-_fake_mod.get_graph = _get_graph
-_fake_mod.get_checkpointer = _get_checkpointer
+setattr(_fake_mod, "_TestLiner", _TestLiner)
 sys.modules[_FAKE_MODULE] = _fake_mod
 
 
@@ -77,7 +86,7 @@ import graphexosuitweb.app as _web_app_module
 @pytest.fixture(autouse=True)
 def reset_core(monkeypatch):
     """Ensure a fresh ExosuitCore per test by resetting the module-level singleton."""
-    monkeypatch.setenv("LANGGRAPH_GRAPH_MODULE", _FAKE_MODULE)
+    monkeypatch.setenv("LANGGRAPH_LINER_CLASS", f"{_FAKE_MODULE}:_TestLiner")
     _web_app_module._core = None
     yield
     _web_app_module._core = None

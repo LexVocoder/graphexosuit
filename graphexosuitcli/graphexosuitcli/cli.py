@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import typer
 from dataclasses import asdict
-from graphexosuit import ExosuitCore, load_graph_and_checkpointer, ResumeValue
+from graphexosuit import ExosuitCore, load_liner, ResumeValue
 from typing import Optional
 
 
@@ -19,10 +19,9 @@ app = typer.Typer(
 
 
 def _load_core():
-    """Load graph, checkpointer, and return an ExosuitCore instance."""
-
-    state_graph, checkpointer = load_graph_and_checkpointer()
-    return ExosuitCore(state_graph, checkpointer)
+    """Load Liner and return an ExosuitCore instance."""
+    liner = load_liner()
+    return ExosuitCore(liner)
 
 
 def _print_result(result) -> None:

@@ -118,19 +118,21 @@ def _extract_checkpoint_id(graph: Any, config: dict) -> Optional[str]:
 class ExosuitCore:
     """Thin runtime wrapper around a compiled LangGraph workflow.
 
-    The constructor accepts an *uncompiled* ``StateGraph`` (or any object that
-    exposes a ``compile(checkpointer=...)`` method) and a checkpointer, then
-    calls ``compile()`` itself.
+    The constructor accepts a Liner-compatible instance that exposes
+    ``get_graph()`` and ``get_checkpointer()`` methods, then compiles
+    the graph with the checkpointer.
 
     Parameters
     ----------
-    state_graph:
-        An uncompiled ``StateGraph`` returned by the developer's ``get_graph()``.
-    checkpointer:
-        A LangGraph checkpointer instance returned by ``get_checkpointer()``.
+    liner:
+        A Liner-compatible instance that provides ``get_graph()`` and
+        ``get_checkpointer()`` methods.
     """
 
-    def __init__(self, state_graph: Any, checkpointer: Any) -> None:
+    def __init__(self, liner: Any) -> None:
+        self._liner = liner
+        state_graph = liner.get_graph()
+        checkpointer = liner.get_checkpointer()
         self._graph_app = state_graph.compile(checkpointer=checkpointer)
 
     # ------------------------------------------------------------------

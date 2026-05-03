@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from graphexosuit import ExosuitCore, ResumeValue, load_graph_and_checkpointer
+from graphexosuit import ExosuitCore, ResumeValue, load_liner
 
 app = FastAPI(
     title="graphexosuitweb",
@@ -21,7 +21,7 @@ app = FastAPI(
 # --------------------------------------------------------------------------
 # Lazily initialise the ExosuitCore from the environment variable.
 # This is done once on first request to allow the module to be imported
-# without LANGGRAPH_GRAPH_MODULE being set (e.g., during testing).
+# without LANGGRAPH_LINER_CLASS being set (e.g., during testing).
 # --------------------------------------------------------------------------
 
 _core: Optional[ExosuitCore] = None
@@ -30,8 +30,8 @@ _core: Optional[ExosuitCore] = None
 def _get_core() -> ExosuitCore:
     global _core
     if _core is None:
-        state_graph, checkpointer = load_graph_and_checkpointer()
-        _core = ExosuitCore(state_graph, checkpointer)
+        liner = load_liner()
+        _core = ExosuitCore(liner)
     return _core
 
 

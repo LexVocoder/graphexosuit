@@ -32,7 +32,7 @@ uv run pytest tests/ -v
 # my_project/workflows.py
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
-from graphexosuit import StandardizedInterrupt, InterruptOption
+from graphexosuit import StandardizedInterrupt, InterruptOption, Liner
 from langgraph.types import interrupt
 from typing import TypedDict
 
@@ -51,25 +51,26 @@ def approval_node(state):
         return {"value": "approved"}
     return {"value": "rejected"}
 
-def get_graph():
-    """Return an *uncompiled* StateGraph — Exosuit compiles it."""
-    builder = StateGraph(State)
-    builder.add_node("approval", approval_node)
-    builder.set_entry_point("approval")
-    builder.set_finish_point("approval")
-    return builder
+class MyWorkflow(Liner):
+    def get_graph(self):
+        """Return an *uncompiled* StateGraph — Exosuit compiles it."""
+        builder = StateGraph(State)
+        builder.add_node("approval", approval_node)
+        builder.set_entry_point("approval")
+        builder.set_finish_point("approval")
+        return builder
 
-def get_checkpointer():
-    return MemorySaver()
+    def get_checkpointer(self):
+        return MemorySaver()
 ```
 
 ### 2. Use ExosuitCore directly
 
 ```python
 from graphexosuit import ExosuitCore, ResumeValue
-from my_project.workflows import get_graph, get_checkpointer
+from my_project.workflows import MyWorkflow
 
-core = ExosuitCore(get_graph(), get_checkpointer())
+core = ExosuitCore(MyWorkflow())
 
 # Run
 result = core.run({"value": "start"}, thread_id="thread-1")
@@ -103,4 +104,4 @@ print(result)
 
 | Variable | Description |
 |----------|-------------|
-| `LANGGRAPH_GRAPH_MODULE` | Dotted module path (e.g. `my_project.workflows`) used by CLI/web packages |
+| `LANGGRAPH_LINER_CLASS` | Module and class path (e.g. `my_project.workflows:MyWorkflow`) used by CLI/web packages |

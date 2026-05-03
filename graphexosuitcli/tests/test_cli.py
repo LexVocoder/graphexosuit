@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import types as _types
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from typer.testing import CliRunner
 
@@ -13,7 +13,7 @@ from graphexosuitcli.cli import app
 
 
 # ---------------------------------------------------------------------------
-# Fixture: minimal in-process graph module
+# Fixture: minimal in-process graph module with Liner-compatible class
 # ---------------------------------------------------------------------------
 # The checkpointer is a module-level singleton so that state is preserved
 # across multiple CLI invocations within the same test.
@@ -65,11 +65,20 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
+class _TestLiner:
+    """Liner-compatible class for testing."""
+
+    def get_graph(self) -> Any:
+        return _get_graph()
+
+    def get_checkpointer(self) -> Any:
+        return _get_checkpointer()
+
+
 # Register fake module on sys.modules so graph_loader can import it
 _FAKE_MODULE = "fake_graph_module"
 _fake_mod = _types.ModuleType(_FAKE_MODULE)
-setattr(_fake_mod, "get_graph", _get_graph)
-setattr(_fake_mod, "get_checkpointer", _get_checkpointer)
+setattr(_fake_mod, "_TestLiner", _TestLiner)
 sys.modules[_FAKE_MODULE] = _fake_mod
 
 
@@ -85,7 +94,7 @@ def _parse_json(output: str) -> dict:
 
 
 def _env():
-    return {"LANGGRAPH_GRAPH_MODULE": _FAKE_MODULE}
+    return {"LANGGRAPH_LINER_CLASS": f"{_FAKE_MODULE}:_TestLiner"}
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +127,7 @@ class TestRunCommand:
 
     def test_run_missing_env_var(self):
         result = runner.invoke(app, ["run", "--input", '{"value": "x"}'])
-        # Should fail because LANGGRAPH_GRAPH_MODULE is not set
+        # Should fail because LANGGRAPH_LINER_CLASS is not set
         assert result.exit_code != 0 or "not set" in result.output
 
 

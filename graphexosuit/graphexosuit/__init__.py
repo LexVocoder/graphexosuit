@@ -8,7 +8,8 @@ from graphexosuit.core import (
     StandardizedInterrupt,
 )
 from graphexosuit.errors import GraphLoaderError
-from graphexosuit.graph_loader import load_graph_and_checkpointer
+from graphexosuit.graph_loader import load_liner
+from graphexosuit.liner import Liner
 
 __all__ = [
     "ExosuitCore",
@@ -16,6 +17,7 @@ __all__ = [
     "ResumeValue",
     "RunResult",
     "StandardizedInterrupt",
+    "Liner",
     "GraphLoaderError",
-    "load_graph_and_checkpointer",
+    "load_liner",
 ]

@@ -1,39 +1,51 @@
-"""Dynamic module loader for graph and checkpointer factories."""
+"""Dynamic module loader for Liner instances."""
 
 from __future__ import annotations
 
 import importlib
 import os
-from typing import Any, Tuple
+from typing import Any
 
 from graphexosuit.errors import GraphLoaderError
 
-_ENV_VAR = "LANGGRAPH_GRAPH_MODULE"
+_ENV_VAR = "LANGGRAPH_LINER_CLASS"
 
 
-def load_graph_and_checkpointer() -> Tuple[Any, Any]:
-    """Import the developer's module and call ``get_graph()`` and ``get_checkpointer()``.
+def load_liner() -> Any:
+    """Import a Liner class and instantiate it.
 
-    The module path is read from the ``LANGGRAPH_GRAPH_MODULE`` environment
-    variable (e.g. ``"my_project.workflows"``).
+    The class path is read from the ``LANGGRAPH_LINER_CLASS`` environment
+    variable using the format ``"module.path:ClassName"``
+    (e.g. ``"my_project.workflows:MyWorkflow"``).
+
+    The returned instance must have ``get_graph()`` and ``get_checkpointer()``
+    methods (duck typing; no strict subclass check required).
 
     Returns
     -------
-    tuple[StateGraph, checkpointer]
-        An uncompiled StateGraph and a checkpointer instance.
+    Any
+        An instantiated object with ``get_graph()`` and ``get_checkpointer()`` methods.
 
     Raises
     ------
     GraphLoaderError
         If the environment variable is missing, the module cannot be imported,
-        or the required functions are absent.
+        the class is not found, or instantiation fails.
     """
-    module_path = os.environ.get(_ENV_VAR)
-    if not module_path:
+    class_path = os.environ.get(_ENV_VAR)
+    if not class_path:
         raise GraphLoaderError(
             f"Environment variable {_ENV_VAR!r} is not set. "
-            "Set it to the dotted module path containing get_graph() and get_checkpointer()."
+            "Set it to the module path and class name (e.g. 'my_project.workflows:MyWorkflow')."
         )
+
+    if ":" not in class_path:
+        raise GraphLoaderError(
+            f"Invalid {_ENV_VAR!r} format: {class_path!r}. "
+            "Expected format: 'module.path:ClassName'."
+        )
+
+    module_path, class_name = class_path.rsplit(":", 1)
 
     try:
         module = importlib.import_module(module_path)
@@ -42,18 +54,15 @@ def load_graph_and_checkpointer() -> Tuple[Any, Any]:
             f"Could not import module {module_path!r}: {exc}"
         ) from exc
 
-    get_graph = getattr(module, "get_graph", None)
-    if get_graph is None or not callable(get_graph):
+    liner_class = getattr(module, class_name, None)
+    if liner_class is None:
         raise GraphLoaderError(
-            f"Module {module_path!r} must define a callable get_graph()."
+            f"Module {module_path!r} has no class named {class_name!r}."
         )
 
-    get_checkpointer = getattr(module, "get_checkpointer", None)
-    if get_checkpointer is None or not callable(get_checkpointer):
+    try:
+        return liner_class()
+    except Exception as exc:
         raise GraphLoaderError(
-            f"Module {module_path!r} must define a callable get_checkpointer()."
-        )
-
-    state_graph = get_graph()
-    checkpointer = get_checkpointer()
-    return state_graph, checkpointer
+            f"Failed to instantiate {class_path!r}: {exc}"
+        ) from exc
