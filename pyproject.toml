@@ -1,5 +1,10 @@
 [tool.uv.workspace]
-members = ["graphexosuit", "graphexosuitcli", "graphexosuitweb"]
+members = [
+    "graphexosuit",
+    "graphexosuitcli",
+    "graphexosuitweb",
+    "samples/interrupt",
+]
 
 [tool.uv.sources]
 graphexosuit = { workspace = true }
