@@ -5,3 +5,9 @@ members = ["graphexosuit", "graphexosuitcli", "graphexosuitweb"]
 graphexosuit = { workspace = true }
 graphexosuitcli = { workspace = true }
 graphexosuitweb = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+]

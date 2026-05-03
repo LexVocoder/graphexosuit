@@ -9,6 +9,12 @@ members = [
     "graphexosuitweb",
 ]
 
+[manifest.dependency-groups]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.4"

@@ -7,7 +7,21 @@ Core Python package for the Exosuit LangGraph runtime ecosystem.
 ## Installation
 
 ```bash
-pip install graphexosuit
+uv pip install graphexosuit
+```
+
+## Testing
+
+Run automated tests using uv:
+
+```bash
+uv run pytest tests/
+```
+
+To run tests with verbose output:
+
+```bash
+uv run pytest tests/ -v
 ```
 
 ## Quick start
