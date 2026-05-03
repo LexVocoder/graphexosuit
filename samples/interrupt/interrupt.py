@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Optional, TypedDict
-from graphexosuit import StandardizedInterrupt, InterruptOption
+from typing import Any, TypedDict
+
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
 
-from graphexosuit.core import RunResult
+from graphexosuit import StandardizedInterrupt, InterruptOption
 from graphexosuit.liner import Liner
 
 # Graph nodes
 
 def initialize(state):
     """Standard initialization node that ensures entire initial state is both valid and captured in the first checkpoint, making it available for resuming and retrying even if the graph fails or is interrupted immediately thereafter."""
-    if not hasattr(state, "value"):
-        raise ValueError("Initial state must have 'value' key")
+
+    if not state or "value" not in state:
+        raise KeyError(f"Initial state must have 'value' key; got {repr(state)}")
 
     return state
 
@@ -38,23 +39,9 @@ class SimpleState(TypedDict):
 
 class SimpleLiner(Liner):
     def __init__(self):
-        """Initialize data persistence.
-        Must be idempotent."""
-
-        # Cross-platform parent of the .cache directory
-        self.cache_dir = os.path.join(
-            os.getenv("LOCALAPPDATA", os.path.expanduser("~")),
-            ".cache",
-            "graphexosuit-samples-interrupt",
-        )
-
-        os.makedirs(self.cache_dir, exist_ok=True)
-
-    def _get_checkpoint_db_path(self) -> str:
-        return os.path.join(self.cache_dir, "checkpoints.db")
+        pass
 
     def get_graph(self) -> StateGraph:
-
         builder = StateGraph(SimpleState)
         builder.add_node("initialize", initialize)
         builder.add_node("node", node)
@@ -65,13 +52,13 @@ class SimpleLiner(Liner):
         return builder
 
     def get_checkpointer(self):
-        return SqliteSaver.from_conn_string(self._get_checkpoint_db_path())
+        # Cross-platform parent of the .cache directory
+        cache_dir = os.path.join(
+            os.getenv("LOCALAPPDATA", os.path.expanduser("~")),
+            ".cache",
+            "graphexosuit-samples-interrupt",
+        )
+        os.makedirs(cache_dir, exist_ok=True)
 
-    def transform_run_result(self, result: RunResult) -> RunResult:
-        if result.completed:
-            # Delete cache folder and all contents upon *successful* completion.
-            # If we delete it on failure or interrupt, we won't be able to resume or retry.
-            os.unlink(self._get_checkpoint_db_path())
-            os.rmdir(self.cache_dir)
-
-        return result
+        path_to_db = os.path.join(cache_dir, "checkpoints.db")
+        return SqliteSaver.from_conn_string(path_to_db)
