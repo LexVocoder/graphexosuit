@@ -11,7 +11,7 @@ import typer
 
 app = typer.Typer(
     name="graphexosuit",
-    help="Execute, pause, resume, and retry LangGraph workflows.",
+    help="Execute, resume, and retry LangGraph workflows.",
     add_completion=False,
 )
 
@@ -26,7 +26,7 @@ def _load_core():
 
 def _print_result(result) -> None:
     """Serialize a RunResult to JSON and print it to stdout."""
-    print(json.dumps(asdict(result), default=str))
+    print(json.dumps(asdict(result), default=str, indent=2))
 
 
 @app.command()
