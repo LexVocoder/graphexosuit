@@ -1,0 +1,7 @@
+[tool.uv.workspace]
+members = ["graphexosuit", "graphexosuitcli", "graphexosuitweb"]
+
+[tool.uv.sources]
+graphexosuit = { workspace = true }
+graphexosuitcli = { workspace = true }
+graphexosuitweb = { workspace = true }
