@@ -104,4 +104,4 @@ print(result)
 
 | Variable | Description |
 |----------|-------------|
-| `LANGGRAPH_LINER_CLASS` | Module and class path (e.g. `my_project.workflows:MyWorkflow`) used by CLI/web packages |
+| `GRAPHEXOSUIT_LINER_CLASS` | Module and class path (e.g. `my_project.workflows:MyWorkflow`) used by CLI/web packages |

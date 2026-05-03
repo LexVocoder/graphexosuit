@@ -95,7 +95,7 @@ def _parse_json(output: str) -> dict:
 
 
 def _env():
-    return {"LANGGRAPH_LINER_CLASS": f"{_FAKE_MODULE}:_TestLiner"}
+    return {"GRAPHEXOSUIT_LINER_CLASS": f"{_FAKE_MODULE}:_TestLiner"}
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ class TestRunCommand:
 
     def test_run_missing_env_var(self):
         result = runner.invoke(app, ["run", "--input", '{"value": "x"}'])
-        # Should fail because LANGGRAPH_LINER_CLASS is not set
+        # Should fail because GRAPHEXOSUIT_LINER_CLASS is not set
         assert result.exit_code != 0 or "not set" in result.output
 
 

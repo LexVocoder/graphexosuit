@@ -21,7 +21,7 @@ app = FastAPI(
 # --------------------------------------------------------------------------
 # Lazily initialise the ExosuitCore from the environment variable.
 # This is done once on first request to allow the module to be imported
-# without LANGGRAPH_LINER_CLASS being set (e.g., during testing).
+# without GRAPHEXOSUIT_LINER_CLASS being set (e.g., during testing).
 # --------------------------------------------------------------------------
 
 _core: Optional[ExosuitCore] = None

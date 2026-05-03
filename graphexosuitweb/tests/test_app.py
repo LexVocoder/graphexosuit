@@ -88,7 +88,7 @@ import graphexosuitweb.app as _web_app_module
 @pytest.fixture(autouse=True)
 def reset_core(monkeypatch):
     """Ensure a fresh ExosuitCore per test by resetting the module-level singleton."""
-    monkeypatch.setenv("LANGGRAPH_LINER_CLASS", f"{_FAKE_MODULE}:_TestLiner")
+    monkeypatch.setenv("GRAPHEXOSUIT_LINER_CLASS", f"{_FAKE_MODULE}:_TestLiner")
     _web_app_module._core = None
     yield
     _web_app_module._core = None

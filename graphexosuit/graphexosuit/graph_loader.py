@@ -8,13 +8,13 @@ from typing import Any
 
 from graphexosuit.errors import GraphLoaderError
 
-_ENV_VAR = "LANGGRAPH_LINER_CLASS"
+_ENV_VAR = "GRAPHEXOSUIT_LINER_CLASS"
 
 
 def load_liner() -> Any:
     """Import a Liner class and instantiate it.
 
-    The class path is read from the ``LANGGRAPH_LINER_CLASS`` environment
+    The class path is read from the ``GRAPHEXOSUIT_LINER_CLASS`` environment
     variable using the format ``"module.path:ClassName"``
     (e.g. ``"my_project.workflows:MyWorkflow"``).
 
