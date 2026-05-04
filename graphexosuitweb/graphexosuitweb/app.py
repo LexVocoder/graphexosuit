@@ -6,6 +6,7 @@ import json
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from typing import Optional
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -57,10 +58,21 @@ def _result_response(result: RunResult) -> JSONResponse:
         interrupt_prime["message"] = result.interrupt_value.message
         interrupt_prime["options"] = []
         for option in result.interrupt_value.options:
-            raise ValueError("Improper URL encoding in the following line")
-            url = f"/resume?thread_id={result.thread_id}&checkpoint_id={result.checkpoint_id}&resume_id={option.id}&payload={json.dumps(option.payload) if option.payload is not None else 'null'}"
- 
-            interrupt_prime["options"].append({"url": url})
+            params = {
+                'thread_id': result.thread_id,
+                'checkpoint_id': result.checkpoint_id,
+                'resume_id': option.id,
+            }
+
+            if (option.payload is not None):
+                params['payload'] = json.dumps(option.payload)
+
+            url = f"/resume?{urlencode(params)}"
+
+            interrupt_prime["options"].append({
+                "label": option.label,
+                "url": url,
+            })
 
         content["interrupt_value"] = interrupt_prime
 
