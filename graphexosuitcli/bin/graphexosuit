@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# PACKAGE_ROOT is the top `graphexosuitcli` directory.
+# One dirname gives us `bin`, the other gives us `graphexosuitcli`.
+PACKAGE_ROOT="$(dirname $(dirname $(realpath $0)))"
+
+exec uv run "${PACKAGE_ROOT}/graphexosuitcli/cli.py" "$@"
