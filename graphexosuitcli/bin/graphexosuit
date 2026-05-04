@@ -4,4 +4,5 @@
 # One dirname gives us `bin`, the other gives us `graphexosuitcli`.
 PACKAGE_ROOT="$(dirname $(dirname $(realpath $0)))"
 
-exec uv run "${PACKAGE_ROOT}/graphexosuitcli/cli.py" "$@"
+# Use --project flag to tell uv where to find graphexosuitcli's dependencies
+exec uv run --project "$PACKAGE_ROOT" "${PACKAGE_ROOT}/graphexosuitcli/cli.py" "$@"
