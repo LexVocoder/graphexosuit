@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from graphexosuit import ExosuitCore, ResumeValue, load_liner
+from graphexosuit.core import RunResult
 
 # --------------------------------------------------------------------------
 # Lazily initialise the ExosuitCore from the environment variable.
@@ -48,8 +49,21 @@ app = FastAPI(
 )
 
 
-def _result_response(result) -> JSONResponse:
-    content = json.loads(json.dumps(asdict(result), default=str))
+def _result_response(result: RunResult) -> JSONResponse:
+    content = asdict(result)
+    if (result.interrupt_value is not None):
+        # Format resume values as URLs
+        interrupt_prime = {}
+        interrupt_prime["message"] = result.interrupt_value.message
+        interrupt_prime["options"] = []
+        for option in result.interrupt_value.options:
+            raise ValueError("Improper URL encoding in the following line")
+            url = f"/resume?thread_id={result.thread_id}&checkpoint_id={result.checkpoint_id}&resume_id={option.id}&payload={json.dumps(option.payload) if option.payload is not None else 'null'}"
+ 
+            interrupt_prime["options"].append({"url": url})
+
+        content["interrupt_value"] = interrupt_prime
+
     return JSONResponse(content=content)
 
 
