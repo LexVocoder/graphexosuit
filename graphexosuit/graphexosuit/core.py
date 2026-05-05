@@ -8,6 +8,7 @@ import uuid
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from langgraph.graph import StateGraph
 from langgraph.types import Command
 from typing import Any, Optional
 
@@ -129,10 +130,16 @@ class ExosuitCore:
         A Liner-compatible instance that provides ``get_compiled_graph()`` and
         ``get_checkpointer()`` methods.
     """
-    # TODO: verify self._liner.get_compiled_graph() does NOT return a StateGraph, as it indicates the user forgot to compile their graph. They need to do that with their own settings.
     def __init__(self, liner: Any) -> None:
         self._liner = liner
         self._graph_app = liner.get_compiled_graph()
+        
+        # Verify that the graph is compiled, not a bare StateGraph
+        if isinstance(self._graph_app, StateGraph):
+            raise ValueError(
+                "ExosuitCore requires a compiled graph, not a StateGraph. "
+                "Ensure your Liner's get_compiled_graph() calls .compile() on the graph."
+            )
         
         # Use ExitStack to manage the checkpointer context manager lifecycle
         self._exit_stack = ExitStack()

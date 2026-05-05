@@ -95,11 +95,15 @@ def _invalid_interrupt_graph() -> StateGraph:
     return builder
 
 
-# TODO: check every call to _make_core to make the thunk returns a *compiled* graph
-def _make_core(compiled_graph_thunk) -> ExosuitCore:
+# Helper to create a TestLiner that properly compiles graphs
+def _make_core(uncompiled_graph_thunk) -> ExosuitCore:
+    checkpointer = MemorySaver()
+    
     class TestLiner:
-        def get_compiled_graph(self) -> StateGraph:
-            return compiled_graph_thunk()
+        def get_compiled_graph(self) -> Any:
+            # Compile the graph with the checkpointer
+            graph = uncompiled_graph_thunk()
+            return graph.compile(checkpointer=checkpointer)
 
         def get_checkpointer(self) -> Any:
             return MemorySaver()
@@ -639,7 +643,10 @@ class TestExosuitCoreLogAndCreateErrorResult:
 class TestExosuitCoreCompile:
     def test_accepts_compiled_graph(self):
         """ExosuitCore must accept a Liner instance with compiled graph."""
-        compiled = _simple_graph.compile()
+        # Create a StateGraph and compile it with a checkpointer
+        graph = _simple_graph()
+        checkpointer = MemorySaver()
+        compiled = graph.compile(checkpointer=checkpointer)
 
         # Should NOT be a StateGraph
         from langgraph.graph.state import StateGraph
@@ -655,3 +662,36 @@ class TestExosuitCoreCompile:
         core = ExosuitCore(TestLiner())
         result = core.run({"value": "test"})
         assert result.completed
+
+    def test_rejects_uncompiled_state_graph(self):
+        """ExosuitCore raises ValueError if get_compiled_graph returns a StateGraph."""
+        # Return an uncompiled StateGraph (not calling .compile())
+        uncompiled = _simple_graph()
+
+        class TestLiner(Liner):
+            def get_compiled_graph(self) -> Any:
+                return uncompiled
+
+            def get_checkpointer(self) -> Any:
+                return MemorySaver()
+
+        with pytest.raises(ValueError, match="compiled graph.*StateGraph"):
+            ExosuitCore(TestLiner())
+
+    def test_rejects_uncompiled_state_graph_error_message(self):
+        """Error message guides users to call .compile()."""
+        uncompiled = _simple_graph()
+
+        class TestLiner(Liner):
+            def get_compiled_graph(self) -> Any:
+                return uncompiled
+
+            def get_checkpointer(self) -> Any:
+                return MemorySaver()
+
+        with pytest.raises(ValueError) as exc_info:
+            ExosuitCore(TestLiner())
+
+        error_msg = str(exc_info.value)
+        assert ".compile()" in error_msg
+
