@@ -52,13 +52,13 @@ def approval_node(state):
     return {"value": "rejected"}
 
 class MyWorkflow(Liner):
-    def get_graph(self):
-        """Return an *uncompiled* StateGraph — Exosuit compiles it."""
+    def get_compiled_graph(self):
+        """Return a *compiled* StateGraph."""
         builder = StateGraph(State)
         builder.add_node("approval", approval_node)
         builder.set_entry_point("approval")
         builder.set_finish_point("approval")
-        return builder
+        return builder.compile()
 
     def get_checkpointer(self):
         return MemorySaver()
@@ -87,7 +87,7 @@ print(result)
 
 | Type | Description |
 |------|-------------|
-| `ExosuitCore` | Main orchestrator: accepts uncompiled graph, compiles it, drives execution |
+| `ExosuitCore` | Main orchestrator: accepts compiled graph, drives execution |
 | `RunResult` | Outcome of any graph invocation |
 | `StandardizedInterrupt` | Value passed to `interrupt()` by graph nodes |
 | `InterruptOption` | A selectable choice within an interrupt |
@@ -95,7 +95,7 @@ print(result)
 
 ## Graph developer contract
 
-* `get_graph()` must return an **uncompiled** `StateGraph` — Exosuit calls `.compile()`.
+* `get_compiled_graph()` must return a **compiled** `StateGraph`.
 * `get_checkpointer()` must return a LangGraph checkpointer.
 * Interrupt with `interrupt(StandardizedInterrupt(...))`.
 * The return value of `interrupt()` is a `ResumeValue` (duck-typed).

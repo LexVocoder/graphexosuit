@@ -10,7 +10,8 @@ pip install graphexosuitcli
 
 ## Configuration
 
-Set the `LANGGRAPH_GRAPH_MODULE` environment variable to the dotted path of the module containing `get_graph()` and `get_checkpointer()`:
+<!-- TODO: change LANGGRAPH_GRAPH_MODULE instances to GRAPHEXOSUIT_LINER_CLASS and update surrounding text -->
+Set the `LANGGRAPH_GRAPH_MODULE` environment variable to the dotted path of the class having `get_compiled_graph()` and `get_checkpointer()` methods:
 
 ```bash
 export LANGGRAPH_GRAPH_MODULE=my_project.workflows

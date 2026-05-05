@@ -95,10 +95,11 @@ def _invalid_interrupt_graph() -> StateGraph:
     return builder
 
 
-def _make_core(graph_fn) -> ExosuitCore:
+# TODO: check every call to _make_core to make the thunk returns a *compiled* graph
+def _make_core(compiled_graph_thunk) -> ExosuitCore:
     class TestLiner:
-        def get_graph(self) -> StateGraph:
-            return graph_fn()
+        def get_compiled_graph(self) -> StateGraph:
+            return compiled_graph_thunk()
 
         def get_checkpointer(self) -> Any:
             return MemorySaver()
@@ -636,16 +637,17 @@ class TestExosuitCoreLogAndCreateErrorResult:
 # ---------------------------------------------------------------------------
 
 class TestExosuitCoreCompile:
-    def test_accepts_uncompiled_graph(self):
-        """ExosuitCore must accept a Liner instance with uncompiled graph."""
-        uncompiled = _simple_graph()
-        # Should NOT be a CompiledStateGraph yet
-        from langgraph.graph.state import CompiledStateGraph
-        assert not isinstance(uncompiled, CompiledStateGraph)
+    def test_accepts_compiled_graph(self):
+        """ExosuitCore must accept a Liner instance with compiled graph."""
+        compiled = _simple_graph.compile()
+
+        # Should NOT be a StateGraph
+        from langgraph.graph.state import StateGraph
+        assert not isinstance(compiled, StateGraph)
 
         class TestLiner(Liner):
-            def get_graph(self) -> StateGraph:
-                return uncompiled
+            def get_compiled_graph(self) -> Any:
+                return compiled
 
             def get_checkpointer(self) -> Any:
                 return MemorySaver()

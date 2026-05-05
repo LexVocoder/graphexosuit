@@ -41,7 +41,7 @@ class SimpleLiner(Liner):
     def __init__(self):
         pass
 
-    def get_graph(self) -> StateGraph:
+    def get_compiled_graph(self) -> Any:
         builder = StateGraph(SimpleState)
         builder.add_node("initialize", initialize)
         builder.add_node("node", node)
@@ -49,7 +49,7 @@ class SimpleLiner(Liner):
         builder.set_entry_point("initialize")
         builder.add_edge("initialize", "node")
         builder.set_finish_point("node")
-        return builder
+        return builder.compile()
 
     def get_checkpointer(self):
         # Cross-platform parent of the .cache directory

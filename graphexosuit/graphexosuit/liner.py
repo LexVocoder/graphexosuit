@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 class Liner(ABC):
     @abstractmethod
-    def get_graph(self) -> StateGraph:
+    def get_compiled_graph(self) -> Any:
         pass
 
     @abstractmethod

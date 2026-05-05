@@ -121,19 +121,18 @@ class ExosuitCore:
     """Thin runtime wrapper around a compiled LangGraph workflow.
 
     The constructor accepts a Liner-compatible instance that exposes
-    ``get_graph()`` and ``get_checkpointer()`` methods, then compiles
-    the graph with the checkpointer.
+    ``get_compiled_graph()`` and ``get_checkpointer()`` methods.
 
     Parameters
     ----------
     liner:
-        A Liner-compatible instance that provides ``get_graph()`` and
+        A Liner-compatible instance that provides ``get_compiled_graph()`` and
         ``get_checkpointer()`` methods.
     """
-
+    # TODO: verify self._liner.get_compiled_graph() does NOT return a StateGraph, as it indicates the user forgot to compile their graph. They need to do that with their own settings.
     def __init__(self, liner: Any) -> None:
         self._liner = liner
-        state_graph = liner.get_graph()
+        self._graph_app = liner.get_compiled_graph()
         
         # Use ExitStack to manage the checkpointer context manager lifecycle
         self._exit_stack = ExitStack()
@@ -148,8 +147,6 @@ class ExosuitCore:
                 ("graphexosuit.core", "StandardizedInterrupt"),
             ]
         )
-        
-        self._graph_app = state_graph.compile(checkpointer=checkpointer)
 
     def close(self) -> None:
         """Close and cleanup the checkpointer context manager."""
@@ -218,7 +215,7 @@ class ExosuitCore:
         thread_id: str = config["configurable"]["thread_id"]
 
         try:
-            output = self._graph_app.invoke(initial_state, config=config)
+            output = self._graph_app.invoke(initial_state, config=config, durability='sync')
         except Exception as exc:
             # An error occurred during graph execution. It could be anything.
             checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
@@ -325,7 +322,7 @@ class ExosuitCore:
                 return self._log_and_create_error_result(
                     exc=exc,
                     thread_id=thread_id,
-                    error_prefix=f"Transformed resume value is not well-formed, but original resume value was valid",
+                    error_prefix=f"Transformed resume value is not well-formed",
                     checkpoint_id=checkpoint_id,
                 )
 
@@ -365,23 +362,6 @@ class ExosuitCore:
                 "checkpoint_id": checkpoint_id,
             }
         }
-        try:
-            state_snapshot = self._graph_app.get_state(config)
-            if not state_snapshot.next:
-                # There is no exception to log, so build a full run result.
-                return self._build_run_result(
-                    completed=False,
-                    thread_id=thread_id,
-                    checkpoint_id=checkpoint_id,
-                    error="No failed node found in state snapshot to retry",
-                )
-            failed_node = state_snapshot.next[0]
-        except Exception as exc:
-            return self._log_and_create_error_result(
-                exc=exc,
-                thread_id=thread_id,
-                error_prefix="Error retrieving state snapshot for retry",
-                checkpoint_id=checkpoint_id,
-            )
 
-        return self._invoke(Command(goto=failed_node), config)
+        # None is a magic value meaning "resume"
+        return self._invoke(None, config)
