@@ -138,7 +138,7 @@ class ExosuitCore:
         if isinstance(self._graph_app, StateGraph):
             raise ValueError(
                 "ExosuitCore requires a compiled graph, not a StateGraph. "
-                "Ensure your Liner's get_compiled_graph() calls .compile() on the graph."
+                "Ensure your Liner's get_compiled_graph() calls .compile(checkpointer=...) on the graph."
             )
         
         # Use ExitStack to manage the checkpointer context manager lifecycle

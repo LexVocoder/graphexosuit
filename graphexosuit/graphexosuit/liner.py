@@ -4,7 +4,7 @@ from langgraph.graph import StateGraph
 from typing import Any, Optional
 
 
-class Liner(ABC):
+class ExosuitLiner(ABC):
     @abstractmethod
     def get_compiled_graph(self) -> Any:
         pass

@@ -9,7 +9,7 @@ from typing import Any, TypedDict
 
 from typer.testing import CliRunner
 
-from graphexosuit.liner import Liner
+from graphexosuit.liner import ExosuitLiner
 from graphexosuitcli.cli import app
 
 
@@ -54,7 +54,7 @@ def _get_compiled_graph():
     builder.add_node("node", node)
     builder.set_entry_point("node")
     builder.set_finish_point("node")
-    return builder.compile()
+    return builder.compile(checkpointer=_get_checkpointer())
 
 
 # Singleton checkpointer shared across all CLI calls in this test session
@@ -66,7 +66,7 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
-class _TestLiner(Liner):
+class _TestLiner(ExosuitLiner):
     """Liner-compatible class for testing."""
 
     def get_compiled_graph(self) -> Any:

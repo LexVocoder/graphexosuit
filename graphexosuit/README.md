@@ -52,16 +52,19 @@ def approval_node(state):
     return {"value": "rejected"}
 
 class MyWorkflow(Liner):
+    def __init__(self):
+        self._checkpointer = MemorySaver()
+
     def get_compiled_graph(self):
         """Return a *compiled* StateGraph."""
         builder = StateGraph(State)
         builder.add_node("approval", approval_node)
         builder.set_entry_point("approval")
         builder.set_finish_point("approval")
-        return builder.compile()
+        return builder.compile(checkpointer=self._checkpointer)
 
     def get_checkpointer(self):
-        return MemorySaver()
+        return self._checkpointer
 ```
 
 ### 2. Use ExosuitCore directly

@@ -9,7 +9,7 @@ from typing import Any, TypedDict
 import pytest
 from httpx import AsyncClient, ASGITransport
 
-from graphexosuit.liner import Liner
+from graphexosuit.liner import ExosuitLiner
 
 
 # ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ class _State(TypedDict):
 _fail_call_count: dict[str, int] = {}
 
 
-def _get_compiled_graph():
+def _get_compiled_graph(checkpointer: Any):
     from langgraph.graph import StateGraph
     from langgraph.types import interrupt
     from graphexosuit import StandardizedInterrupt, InterruptOption
@@ -50,7 +50,7 @@ def _get_compiled_graph():
     builder.add_node("node", node)
     builder.set_entry_point("node")
     builder.set_finish_point("node")
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
 
 
 from langgraph.checkpoint.memory import MemorySaver as _MemorySaver
@@ -61,11 +61,11 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
-class _TestLiner(Liner):
+class _TestLiner(ExosuitLiner):
     """Liner-compatible class for testing."""
 
     def get_compiled_graph(self) -> Any:
-        return _get_compiled_graph()
+        return _get_compiled_graph(self.get_checkpointer())
 
     def get_checkpointer(self) -> Any:
         return _get_checkpointer()
