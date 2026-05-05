@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 import traceback
 import uuid
-from contextlib import ExitStack
 from dataclasses import dataclass, field
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import StateGraph
@@ -141,10 +140,7 @@ class ExosuitCore:
                 "Ensure your Liner's get_compiled_graph() calls .compile(checkpointer=...) on the graph."
             )
         
-        # Use ExitStack to manage the checkpointer context manager lifecycle
-        self._exit_stack = ExitStack()
-        checkpointer_cm = liner.get_checkpointer()
-        checkpointer = self._exit_stack.enter_context(checkpointer_cm)
+        checkpointer = liner.get_checkpointer()
         
         # Register graphexosuit types with the serializer to prevent deserialization warnings
         checkpointer.serde = JsonPlusSerializer(
@@ -154,17 +150,6 @@ class ExosuitCore:
                 ("graphexosuit.core", "StandardizedInterrupt"),
             ]
         )
-
-    def close(self) -> None:
-        """Close and cleanup the checkpointer context manager."""
-        self._exit_stack.close()
-
-    def __del__(self) -> None:
-        """Ensure cleanup on garbage collection."""
-        try:
-            self.close()
-        except Exception:
-            pass
 
     # ------------------------------------------------------------------
     # Internal helpers

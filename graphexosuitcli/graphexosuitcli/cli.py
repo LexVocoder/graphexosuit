@@ -109,12 +109,9 @@ def run(
 
     core = _load_core(liner_class=liner_class, liner_dir=liner_dir)
 
-    try:
-        result = core.run(initial_state, thread_id=thread_id)
-        _print_result(result)
-        _print_tips_to_stderr(result, liner_class, liner_dir)
-    finally:
-        core.close()
+    result = core.run(initial_state, thread_id=thread_id)
+    _print_result(result)
+    _print_tips_to_stderr(result, liner_class, liner_dir)
 
 
 @app.command()
@@ -142,13 +139,11 @@ def resume(
             raise typer.Exit(code=1)
 
     core = _load_core(liner_class=liner_class, liner_dir=liner_dir)
-    try:
-        resume_value = ResumeValue(id=resume_id, payload=payload_data)
-        result = core.resume(thread_id, checkpoint_id, resume_value)
-        _print_result(result)
-        _print_tips_to_stderr(result, liner_class, liner_dir)
-    finally:
-        core.close()
+
+    resume_value = ResumeValue(id=resume_id, payload=payload_data)
+    result = core.resume(thread_id, checkpoint_id, resume_value)
+    _print_result(result)
+    _print_tips_to_stderr(result, liner_class, liner_dir)
 
 
 @app.command()
@@ -164,12 +159,9 @@ def retry(
 ) -> None:
     """Retry the failed node of a graph execution."""
     core = _load_core(liner_class=liner_class, liner_dir=liner_dir)
-    try:
-        result = core.retry(thread_id, checkpoint_id)
-        _print_result(result)
-        _print_tips_to_stderr(result, liner_class, liner_dir)
-    finally:
-        core.close()
+    result = core.retry(thread_id, checkpoint_id)
+    _print_result(result)
+    _print_tips_to_stderr(result, liner_class, liner_dir)
 
 
 def main() -> None:
