@@ -9,6 +9,7 @@ import os
 import sys
 import typer
 from dataclasses import asdict
+from shlex import quote
 from typing import Optional
 
 from graphexosuit import ExosuitCore, load_liner, ResumeValue
@@ -53,39 +54,44 @@ def _print_tips_to_stderr(
 
     tip = ""
     if run_result.interrupt_value is not None:
-        tip += f"Graph execution paused. {run_result.interrupt_value.message}:\n\n"
+        tip += f"Graph execution paused; message = {repr(run_result.interrupt_value.message)}\n"
 
         for option in run_result.interrupt_value.options:
-            tip += f"- For {option.label}, run graphexosuit resume "
-
-            if liner_class:
-                tip += f"--liner-class {repr(liner_class)} "
-
-            if liner_dir:
-                tip += f"--liner-dir {repr(liner_dir)} "
-
-            tip += f"--thread-id {repr(run_result.thread_id)} "
-            tip += f"--checkpoint-id {repr(run_result.checkpoint_id)} "
-            tip += f"--resume-id {repr(option.id)} "
-            if option.payload is not None:
-                tip += f"--payload {repr(json.dumps(option.payload))}"
             tip += "\n"
+            tip += f"- For {repr(option.label)}, run:  "
+            tip += f"graphexosuit resume "
+            tip += to_cli_args(run_result, liner_class, liner_dir)
+
+            # Resumption requires arguments from the given option
+            tip += f"--resume-id {quote(option.id)} "
+            if option.payload is not None:
+                tip += f"--payload {quote(json.dumps(option.payload))}"
+
     elif run_result.error_message:
         tip += "Graph execution failed. To retry, run:\n"
-        tip += f"  graphexosuit retry "
+        tip += "\n"
+        tip += f"    graphexosuit retry "
 
-        if liner_class:
-            tip += f"--liner-class {repr(liner_class)} "
+        tip += to_cli_args(run_result, liner_class, liner_dir)
 
-        if liner_dir:
-            tip += f"--liner-dir {repr(liner_dir)} "
-
-        tip += f"--thread-id {repr(run_result.thread_id)} "
-        tip += f"--checkpoint-id {repr(run_result.checkpoint_id)}"
     # else we got no tips
 
     if tip:
-        print(tip, file=sys.stderr)
+        print(tip, file=sys.stderr)  # adds a newline at the end
+
+def to_cli_args(run_result, liner_class, liner_dir):
+    args = ''
+    if liner_class:
+        args += f"--liner-class {quote(liner_class)} "
+
+    if liner_dir:
+        args += f"--liner-dir {quote(liner_dir)} "
+
+    args += f"--thread-id {quote(run_result.thread_id)} "
+
+    if run_result.checkpoint_id:
+        args += f"--checkpoint-id {quote(run_result.checkpoint_id)} "
+    return args
 
 @app.command()
 def run(
