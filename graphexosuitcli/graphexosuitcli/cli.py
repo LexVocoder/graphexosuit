@@ -48,11 +48,11 @@ def _print_tips_to_stderr(
         liner_dir: Optional[str] = None,
     ) -> None:
     """Print re-execution tips to stderr if the graph execution did not complete."""
-    if run_result.completed:
+    if run_result.final_result is not None:
         return
 
     tip = ""
-    if run_result.paused and run_result.interrupt_value is not None:
+    if run_result.interrupt_value is not None:
         tip += f"Graph execution paused. {run_result.interrupt_value.message}:\n\n"
 
         for option in run_result.interrupt_value.options:
@@ -70,7 +70,7 @@ def _print_tips_to_stderr(
             if option.payload is not None:
                 tip += f"--payload {repr(json.dumps(option.payload))}"
             tip += "\n"
-    elif run_result.error:
+    elif run_result.error_message:
         tip += "Graph execution failed. To retry, run:\n"
         tip += f"  graphexosuit retry "
 

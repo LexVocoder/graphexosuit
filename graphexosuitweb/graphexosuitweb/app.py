@@ -76,7 +76,7 @@ def _result_response(result: RunResult) -> JSONResponse:
 
         content["interrupt_value"] = interrupt_prime
 
-    if (result.error is not None):
+    if (result.error_message is not None):
         # Format retry URL
         params = {
             'thread_id': result.thread_id,

@@ -109,8 +109,8 @@ class TestRunCommand:
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
-        assert data["completed"] is True
-        assert data["result"]["value"] == "hello_done"
+        assert data["final_result"] is not None
+        assert data["final_result"]["value"] == "hello_done"
 
     def test_run_with_thread_id(self):
         result = runner.invoke(
@@ -146,7 +146,7 @@ class TestResumeCommand:
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
-        assert data["paused"] is True
+        assert data["interrupt_value"] is not None
         return data["thread_id"], data["checkpoint_id"]
 
     def test_resume_completes(self):
@@ -163,7 +163,7 @@ class TestResumeCommand:
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
-        assert data["completed"] is True
+        assert data["final_result"] is not None
 
     def test_resume_with_payload(self):
         thread_id, checkpoint_id = self._get_paused()
@@ -180,7 +180,7 @@ class TestResumeCommand:
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
-        assert data["completed"] is True
+        assert data["final_result"] is not None
 
     def test_resume_invalid_payload_json(self):
         result = runner.invoke(
@@ -211,7 +211,7 @@ class TestRetryCommand:
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
-        assert data["error"] is not None
+        assert data["error_message"] is not None
 
         result2 = runner.invoke(
             app,
@@ -224,4 +224,4 @@ class TestRetryCommand:
         )
         assert result2.exit_code == 0, result2.output
         data2 = _parse_json(result2.output)
-        assert data2["completed"] is True
+        assert data2["final_result"] is not None

@@ -111,8 +111,8 @@ class TestRunEndpoint:
         resp = await client.post("/run", json={"input": {"value": "hello"}})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["completed"] is True
-        assert data["result"]["value"] == "hello_done"
+        assert data["final_result"] is not None
+        assert data["final_result"]["value"] == "hello_done"
 
     async def test_run_with_thread_id(self, client: AsyncClient):
         resp = await client.post(
@@ -129,8 +129,8 @@ class TestRunEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["paused"] is True
         assert data["checkpoint_id"] is not None
+        assert data["interrupt_value"] is not None
         assert data["interrupt_value"]["message"] == "Choose"
 
 
@@ -146,7 +146,7 @@ class TestResumeEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["paused"] is True
+        assert data["interrupt_value"] is not None
         return data["thread_id"], data["checkpoint_id"]
 
     async def test_resume_completes(self, client: AsyncClient):
@@ -161,7 +161,7 @@ class TestResumeEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["completed"] is True
+        assert data["final_result"] is not None
 
     async def test_resume_with_payload(self, client: AsyncClient):
         import json
@@ -177,7 +177,7 @@ class TestResumeEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["completed"] is True
+        assert data["final_result"] is not None
 
     async def test_resume_invalid_payload(self, client: AsyncClient):
         resp = await client.post(
@@ -210,7 +210,7 @@ class TestRetryEndpoint:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["error"] is not None
+        assert data["error_message"] is not None
 
         resp2 = await client.post(
             "/retry",
@@ -221,7 +221,7 @@ class TestRetryEndpoint:
         )
         assert resp2.status_code == 200
         data2 = resp2.json()
-        assert data2["completed"] is True
+        assert data2["final_result"] is not None
 
     async def test_get_retry_returns_405(self, client: AsyncClient):
         resp = await client.get("/retry")

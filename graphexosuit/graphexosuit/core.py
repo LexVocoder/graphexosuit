@@ -48,46 +48,46 @@ class ResumeValue:
 
 @dataclass
 class RunResult:
-    """The outcome of a graph execution, pause, or error."""
+    """The outcome of a graph execution, pause, or error.
 
-    completed: bool
+    Exactly one of error_message, interrupt_value, or final_result is non-None.
+    """
+
     thread_id: str
     checkpoint_id: Optional[str] = None
-    error: Optional[str] = None
+    error_message: Optional[str] = None
     interrupt_value: Optional[StandardizedInterrupt] = None
-    paused: bool = False
-    result: Optional[dict] = None
+    final_result: Optional[dict] = None
 
     def __post_init__(self) -> None:
         _validate_run_result(self)
 
 
 def _validate_run_result(result: RunResult) -> None:
-    """Raise ValueError if RunResult is in an inconsistent state."""
-    if result.completed:
-        if result.error:
-            raise ValueError(
-                "RunResult: completed=True is incompatible with error being set"
-            )
-        if result.paused:
-            raise ValueError(
-                "RunResult: completed=True is incompatible with paused=True"
-            )
-    elif result.paused:
-        if result.interrupt_value is None:
-            raise ValueError(
-                "RunResult: paused=True requires interrupt_value to be set"
-            )
-        if result.checkpoint_id is None:
-            raise ValueError(
-                "RunResult: paused=True requires checkpoint_id to be set"
-            )
-    else:
-        # completed=False, paused=False  →  must have an error
-        if not result.error:
-            raise ValueError(
-                "RunResult: completed=False and paused=False requires error to be set"
-            )
+    """Raise ValueError if RunResult is in an inconsistent state.
+
+    Exactly one of error_message, interrupt_value, or final_result must be non-None.
+    If interrupt_value or error_message is set, checkpoint_id must also be set.
+    """
+    has_completion = result.final_result is not None
+    has_error = result.error_message is not None
+    has_interrupt = result.interrupt_value is not None
+
+    terminal_states = sum([has_completion, has_error, has_interrupt])
+    if terminal_states != 1:
+        raise ValueError(
+            "RunResult: exactly one of final_result, error_message, or interrupt_value must be set"
+        )
+
+    if has_interrupt and result.checkpoint_id is None:
+        raise ValueError(
+            "RunResult: interrupt_value set requires checkpoint_id to be set"
+        )
+
+    if has_error and result.checkpoint_id is None:
+        raise ValueError(
+            "RunResult: error_message set requires checkpoint_id to be set"
+        )
 
 
 def _validate_interrupt_value(value: Any) -> None:
@@ -157,23 +157,19 @@ class ExosuitCore:
 
     def _build_run_result(
             self,
-            completed: bool,
             thread_id: str,
             checkpoint_id: Optional[str] = None,
-            error: Optional[str] = None,
+            error_message: Optional[str] = None,
             interrupt_value: Optional[StandardizedInterrupt] = None,
-            paused: bool = False,
-            result: Optional[dict] = None,
+            final_result: Optional[dict] = None,
     ) -> RunResult:
         """Helper to construct a RunResult with optional transformation & validation."""
         run_result = RunResult(
-            completed=completed,
             thread_id=thread_id,
             checkpoint_id=checkpoint_id,
-            error=error,
+            error_message=error_message,
             interrupt_value=interrupt_value,
-            paused=paused,
-            result=result,
+            final_result=final_result,
         )
 
         if hasattr(self._liner, "transform_run_result"):
@@ -186,18 +182,16 @@ class ExosuitCore:
             self,
             exc: Exception,
             thread_id: str,
+            checkpoint_id: str,
             error_prefix: Optional[str] = None,
-            checkpoint_id: Optional[str] = None,
     ) -> RunResult:
 
         traceback.print_exception(exc, file=sys.stderr)
 
         run_result = self._build_run_result(
-                completed=False,
                 thread_id=thread_id,
                 checkpoint_id=checkpoint_id,
-                error=f"{error_prefix}: {exc}" if error_prefix else str(exc),
-                paused=False,
+                error_message=f"{error_prefix}: {exc}" if error_prefix else str(exc),
             )
 
         return run_result
@@ -215,7 +209,7 @@ class ExosuitCore:
                 exc=exc,
                 thread_id=thread_id,
                 error_prefix="Error during graph execution",
-                checkpoint_id=checkpoint_id,
+                checkpoint_id=checkpoint_id if checkpoint_id else "unknown",
             )
 
         # LangGraph signals an interrupt by including __interrupt__ in the output
@@ -230,22 +224,19 @@ class ExosuitCore:
                     exc=exc,
                     thread_id=thread_id,
                     error_prefix=f"Graph returned an invalid interrupt value",
-                    checkpoint_id=checkpoint_id,
+                    checkpoint_id=checkpoint_id if checkpoint_id else "unknown",
                 )
 
             checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
             return self._build_run_result(
-                completed=False,
                 thread_id=thread_id,
-                paused=True,
                 interrupt_value=interrupt_obj,
                 checkpoint_id=checkpoint_id,
             )
 
         return self._build_run_result(
-            completed=True,
             thread_id=thread_id,
-            result=output if isinstance(output, dict) else {"output": output},
+            final_result=output if isinstance(output, dict) else {"output": output},
         )
 
     # ------------------------------------------------------------------
@@ -299,10 +290,9 @@ class ExosuitCore:
             # Client did not provide a well-formed resume value.
             # Don't log stack trace to stderr, because it's a client error.
             return self._build_run_result(
-                completed=False,
-                error=f"Given resume value is not well-formed: {exc}",
                 thread_id=thread_id,
                 checkpoint_id=checkpoint_id,
+                error_message=f"Given resume value is not well-formed: {exc}",
             )
 
         if hasattr(self._liner, "transform_resume_value"):

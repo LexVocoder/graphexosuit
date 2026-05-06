@@ -117,47 +117,48 @@ def _make_core(uncompiled_graph_thunk) -> ExosuitCore:
 
 class TestRunResultValidation:
     def test_completed_valid(self):
-        r = RunResult(completed=True, thread_id="t1", result={"x": 1})
-        assert r.completed
+        r = RunResult(thread_id="t1", final_result={"x": 1})
+        assert r.final_result is not None
 
-    def test_completed_with_error_raises(self):
-        with pytest.raises(ValueError, match="incompatible"):
-            RunResult(completed=True, thread_id="t1", error="oops")
+    def test_completion_result_with_error_raises(self):
+        with pytest.raises(ValueError, match="exactly one"):
+            RunResult(thread_id="t1", error_message="oops", final_result={"x": 1})
 
-    def test_completed_with_paused_raises(self):
-        with pytest.raises(ValueError, match="incompatible"):
-            RunResult(completed=True, thread_id="t1", paused=True)
+    def test_completion_result_with_interrupt_raises(self):
+        iv = StandardizedInterrupt(message="m", options=[])
+        with pytest.raises(ValueError, match="exactly one"):
+            RunResult(
+                thread_id="t1",
+                interrupt_value=iv,
+                final_result={"x": 1},
+                checkpoint_id="cid"
+            )
 
     def test_paused_valid(self):
         iv = StandardizedInterrupt(message="m", options=[])
         r = RunResult(
-            completed=False, thread_id="t1", paused=True,
-            interrupt_value=iv, checkpoint_id="cid"
+            thread_id="t1",
+            interrupt_value=iv,
+            checkpoint_id="cid"
         )
-        assert r.paused
-
-    def test_paused_missing_interrupt_value_raises(self):
-        with pytest.raises(ValueError, match="interrupt_value"):
-            RunResult(
-                completed=False, thread_id="t1", paused=True,
-                checkpoint_id="cid"
-            )
+        assert r.interrupt_value is not None
 
     def test_paused_missing_checkpoint_id_raises(self):
         iv = StandardizedInterrupt(message="m", options=[])
         with pytest.raises(ValueError, match="checkpoint_id"):
-            RunResult(
-                completed=False, thread_id="t1", paused=True,
-                interrupt_value=iv
-            )
+            RunResult(thread_id="t1", interrupt_value=iv)
 
     def test_error_valid(self):
-        r = RunResult(completed=False, thread_id="t1", error="boom")
-        assert r.error == "boom"
+        r = RunResult(thread_id="t1", error_message="boom", checkpoint_id="cid")
+        assert r.error_message == "boom"
 
-    def test_error_missing_raises(self):
-        with pytest.raises(ValueError, match="error"):
-            RunResult(completed=False, thread_id="t1")
+    def test_error_missing_checkpoint_id_raises(self):
+        with pytest.raises(ValueError, match="checkpoint_id"):
+            RunResult(thread_id="t1", error_message="boom")
+
+    def test_no_terminal_state_raises(self):
+        with pytest.raises(ValueError, match="exactly one"):
+            RunResult(thread_id="t1")
 
 
 # ---------------------------------------------------------------------------
@@ -213,10 +214,10 @@ class TestExosuitCoreRun:
     def test_run_to_completion(self):
         core = _make_core(_simple_graph)
         result = core.run({"value": "hello"})
-        assert result.completed
-        assert not result.paused
-        assert result.error is None
-        assert result.result == {"value": "hello_done"}
+        assert result.final_result is not None
+        assert result.error_message is None
+        assert result.interrupt_value is None
+        assert result.final_result == {"value": "hello_done"}
 
     def test_run_generates_thread_id(self):
         core = _make_core(_simple_graph)
@@ -231,27 +232,27 @@ class TestExosuitCoreRun:
     def test_run_pauses_on_interrupt(self):
         core = _make_core(_interrupt_graph)
         result = core.run({"value": "start"})
-        assert not result.completed
-        assert result.paused
+        assert result.final_result is None
         assert result.interrupt_value is not None
+        assert result.error_message is None
         assert result.interrupt_value.message == "Approve?"
         assert result.checkpoint_id is not None
 
     def test_run_error_returns_error_result(self):
         core = _make_core(_error_graph)
         result = core.run({"value": "start"})
-        assert not result.completed
-        assert not result.paused
-        assert result.error is not None and "first attempt failed" in result.error
+        assert result.final_result is None
+        assert result.interrupt_value is None
+        assert result.error_message is not None and "first attempt failed" in result.error_message
 
     def test_run_invalid_interrupt_returns_error_result(self):
         core = _make_core(_invalid_interrupt_graph)
         result = core.run({"value": "start"})
-        assert not result.completed
-        assert not result.paused
-        assert result.error is not None
+        assert result.final_result is None
+        assert result.interrupt_value is None
+        assert result.error_message is not None
         # Error can be due to serialization or validation
-        assert result.error != ""
+        assert result.error_message != ""
 
     def test_run_without_transform_initial_state_passes_unchanged(self):
         """When liner has no transform_initial_state, initial_state is passed to _invoke unchanged."""
@@ -313,7 +314,7 @@ class TestExosuitCoreResume:
     def _paused_core(self):
         core = _make_core(_interrupt_graph)
         run_result = core.run({"value": "start"}, thread_id="t-resume")
-        assert run_result.paused
+        assert run_result.interrupt_value is not None
         return core, run_result
 
     def test_resume_completes(self):
@@ -321,16 +322,16 @@ class TestExosuitCoreResume:
         assert run_result.checkpoint_id is not None
         rv = ResumeValue(id="approve", payload=None)
         result = core.resume(run_result.thread_id, run_result.checkpoint_id, rv)
-        assert result.completed
-        assert result.result == {"value": "approve"}
+        assert result.final_result is not None
+        assert result.final_result == {"value": "approve"}
 
     def test_resume_invalid_resume_value(self):
         core, run_result = self._paused_core()
         assert run_result.checkpoint_id is not None
         bad = MagicMock(spec=["id"])  # missing payload
         result = core.resume(run_result.thread_id, run_result.checkpoint_id, bad)
-        assert not result.completed
-        assert result.error is not None and "ResumeValue" in result.error
+        assert result.final_result is None
+        assert result.error_message is not None and "ResumeValue" in result.error_message
 
     def test_resume_malformed_resume_value_no_stderr_logging(self, capsys):
         """Malformed resume_value returns error but does NOT log to stderr (it's a client error)."""
@@ -344,9 +345,9 @@ class TestExosuitCoreResume:
         assert captured.err == ""
         
         # Verify result is an error
-        assert not result.completed
-        assert result.error is not None
-        assert "ResumeValue" in result.error
+        assert result.final_result is None
+        assert result.error_message is not None
+        assert "ResumeValue" in result.error_message
 
     def test_resume_without_transform_passes_original_to_invoke(self):
         """When liner has no transform_resume_value, original resume_value is passed in Command to _invoke."""
@@ -423,9 +424,9 @@ class TestExosuitCoreResume:
         assert "ResumeValue" in captured.err
         
         # Verify result is an error
-        assert not result.completed
-        assert result.error  # truthy
-        assert "Transformed resume value is not well-formed" in result.error
+        assert result.final_result is None
+        assert result.error_message  # truthy
+        assert "Transformed resume value is not well-formed" in result.error_message
 
 
 # ---------------------------------------------------------------------------
@@ -437,12 +438,12 @@ class TestExosuitCoreRetry:
         core = _make_core(_error_graph)
         # First call: error
         err_result = core.run({"value": "start"}, thread_id="t-retry")
-        assert err_result.error
+        assert err_result.error_message
         assert err_result.checkpoint_id is not None
         # Retry
         result = core.retry(err_result.thread_id, err_result.checkpoint_id)
-        assert result.completed
-        assert result.result == {"value": "recovered"}
+        assert result.final_result is not None
+        assert result.final_result == {"value": "recovered"}
 
     def test_retry_calls_on_retry_hook(self):
         """When liner has on_retry method, retry calls it."""
@@ -460,7 +461,7 @@ class TestExosuitCoreRetry:
         
         # First call: error
         err_result = core.run({"value": "start"}, thread_id="t-hook")
-        assert err_result.error
+        assert err_result.error_message
         assert err_result.checkpoint_id is not None
         
         # Retry
@@ -483,7 +484,7 @@ class TestExosuitCoreRetry:
         
         # First call: error
         err_result = core.run({"value": "start"}, thread_id="t-hook-error")
-        assert err_result.error
+        assert err_result.error_message
         assert err_result.checkpoint_id is not None
         
         # Retry
@@ -495,9 +496,9 @@ class TestExosuitCoreRetry:
         assert "on_retry failed" in captured.err
         
         # Verify result is an error
-        assert not result.completed
-        assert result.error  # truthy
-        assert "on_retry" in result.error
+        assert result.final_result is None
+        assert result.error_message  # truthy
+        assert "on_retry" in result.error_message
 
     def test_retry_get_state_raises_logs_stderr(self, capsys):
         """When retry's _invoke raises an exception during execution, stderr is logged and error returned."""
@@ -505,7 +506,7 @@ class TestExosuitCoreRetry:
         
         # First call: error result
         err_result = core.run({"value": "start"}, thread_id="t-get-state-error")
-        assert err_result.error
+        assert err_result.error_message
         assert err_result.checkpoint_id is not None
         
         # On second retry attempt, the error graph will error again on first execution
@@ -516,8 +517,8 @@ class TestExosuitCoreRetry:
         # (The error graph fails on first attempt, succeeds on second)
         captured = capsys.readouterr()
         # Since this is the second call, the error_graph should recover
-        assert result.completed
-        assert result.result == {"value": "recovered"}
+        assert result.final_result is not None
+        assert result.final_result == {"value": "recovered"}
 
 
 # ---------------------------------------------------------------------------
@@ -531,16 +532,16 @@ class TestExosuitCoreBuildRunResult:
 
         # Mock transform_run_result to modify the result
         def transform_fn(result):
-            result.result = {"modified": True}
+            result.final_result = {"modified": True}
             return result
 
         core._liner.transform_run_result = transform_fn
 
         result = core._build_run_result(
-            completed=True, thread_id="t1", result={"original": True}
+            thread_id="t1", final_result={"original": True}
         )
 
-        assert result.result == {"modified": True}
+        assert result.final_result == {"modified": True}
 
     def test_build_run_result_without_transform(self):
         """Test _build_run_result when liner doesn't have transform_run_result."""
@@ -550,12 +551,12 @@ class TestExosuitCoreBuildRunResult:
         assert not hasattr(core._liner, "transform_run_result")
 
         result = core._build_run_result(
-            completed=True, thread_id="t1", result={"value": "test"}
+            thread_id="t1", final_result={"value": "test"}
         )
 
         # Result should pass through without modification
-        assert result.result == {"value": "test"}
-        assert result.completed
+        assert result.final_result == {"value": "test"}
+        assert result.error_message is None
 
 
 # ---------------------------------------------------------------------------
@@ -581,11 +582,11 @@ class TestExosuitCoreLogAndCreateErrorResult:
         assert "ValueError" in captured.err
 
         # Verify result is valid and has expected error format
-        assert not result.completed
-        assert not result.paused
-        assert result.error is not None
-        assert "Custom prefix" in result.error
-        assert "test error" in result.error
+        assert result.final_result is None
+        assert result.interrupt_value is None
+        assert result.error_message is not None
+        assert "Custom prefix" in result.error_message
+        assert "test error" in result.error_message
         assert result.thread_id == "t1"
         assert result.checkpoint_id == "cid1"
 
@@ -606,10 +607,10 @@ class TestExosuitCoreLogAndCreateErrorResult:
         assert "RuntimeError" in captured.err
 
         # Verify result is valid and has expected error format
-        assert not result.completed
-        assert not result.paused
-        assert result.error is not None
-        assert result.error == "boom"
+        assert result.final_result is None
+        assert result.interrupt_value is None
+        assert result.error_message is not None
+        assert result.error_message == "boom"
         assert result.thread_id == "t2"
         assert result.checkpoint_id == "cid2"
 
@@ -639,7 +640,7 @@ class TestExosuitCoreCompile:
 
         core = ExosuitCore(TestLiner())
         result = core.run({"value": "test"})
-        assert result.completed
+        assert result.final_result is not None
 
     def test_rejects_uncompiled_state_graph(self):
         """ExosuitCore raises ValueError if get_compiled_graph returns a StateGraph."""
