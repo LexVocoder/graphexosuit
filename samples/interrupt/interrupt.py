@@ -23,10 +23,10 @@ def initialize(state):
 def node(state):
     post_interrupt_data = interrupt(
         StandardizedInterrupt(
-            message="Choose",
+            message="Choose an ice cream flavor",
             options=[
-                InterruptOption(id="ok", label="OK"),
-                InterruptOption(id="cancel", label="Cancel"),
+                InterruptOption(id="chocolate", label="I prefer chocolate"),
+                InterruptOption(id="vanilla", label="I prefer vanilla"),
             ],
         )
     )
