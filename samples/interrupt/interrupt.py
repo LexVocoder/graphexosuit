@@ -25,8 +25,8 @@ def node(state):
         StandardizedInterrupt(
             message="Choose an ice cream flavor",
             options=[
-                InterruptOption(id="chocolate", label="I prefer chocolate"),
-                InterruptOption(id="vanilla", label="I prefer vanilla"),
+                InterruptOption(label="I prefer chocolate", payload={"flavor": "chocolate"}),
+                InterruptOption(label="I prefer vanilla", payload={"flavor": "vanilla"}),
             ],
         )
     )
