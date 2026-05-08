@@ -1,12 +1,12 @@
 [project]
-name = "graphexosuitcli"
+name = "graphexosuit-layer-cli"
 version = "0.1.0"
 description = "Typer CLI for graphexosuit LangGraph workflows"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
 dependencies = [
-    "graphexosuit>=0.1.0",
+    "graphexosuit-core>=0.1.0",
     "typer>=0.9.0",
 ]
 

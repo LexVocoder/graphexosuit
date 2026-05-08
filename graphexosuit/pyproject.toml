@@ -1,5 +1,5 @@
 [project]
-name = "graphexosuit"
+name = "graphexosuit-core"
 version = "0.1.0"
 description = "Lightweight, flexible framework for executing LangGraphs from web or CLI"
 readme = "README.md"
