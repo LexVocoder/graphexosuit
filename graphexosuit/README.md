@@ -70,7 +70,7 @@ class MyWorkflow(Liner):
 ### 2. Use ExosuitCore directly
 
 ```python
-from graphexosuit import ExosuitCore, ResumeValue
+from graphexosuit import ExosuitCore
 from my_project.workflows import MyWorkflow
 
 core = ExosuitCore(MyWorkflow())
@@ -80,7 +80,7 @@ result = core.run({"value": "start"}, thread_id="thread-1")
 
 # If paused, resume
 if result.paused:
-    rv = ResumeValue(id="approve", payload=None)
+    rv = { ... }
     result = core.resume(result.thread_id, result.checkpoint_id, rv)
 
 print(result)
@@ -94,14 +94,12 @@ print(result)
 | `RunResult` | Outcome of any graph invocation |
 | `StandardizedInterrupt` | Value passed to `interrupt()` by graph nodes |
 | `InterruptOption` | A selectable choice within an interrupt |
-| `ResumeValue` | The selected option sent back when resuming |
 
 ## Graph developer contract
 
 * `get_compiled_graph()` must return a **compiled** `StateGraph`.
 * `get_checkpointer()` must return a LangGraph checkpointer.
 * Interrupt with `interrupt(StandardizedInterrupt(...))`.
-* The return value of `interrupt()` is a `ResumeValue` (duck-typed).
 
 ## Environment variable
 

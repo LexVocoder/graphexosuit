@@ -161,7 +161,7 @@ class TestRunResultValidation:
 
 
 # ---------------------------------------------------------------------------
-# Interrupt / ResumeValue validation helpers
+# Interrupt validation helpers
 # ---------------------------------------------------------------------------
 
 class TestValidationHelpers:

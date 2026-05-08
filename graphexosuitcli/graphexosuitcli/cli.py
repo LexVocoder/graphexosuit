@@ -22,6 +22,8 @@ app = typer.Typer(
     add_completion=False,
 )
 
+def _get_quoted_program_name() -> str:
+    return quote(sys.argv[0] if len(sys.argv) > 0 else "graphexosuit")
 
 def _load_core(
         liner_class: Optional[str] = None,
@@ -59,8 +61,8 @@ def _print_tips_to_stderr(
         for option in run_result.interrupt_value.options:
             tip += "\n"
             tip += f"- For {repr(option.label)}, run:  "
-            tip += f"graphexosuit resume "
-            tip += to_cli_args(run_result, liner_class, liner_dir)
+            tip += f"{_get_quoted_program_name()} resume "
+            tip += _to_cli_args(run_result, liner_class, liner_dir)
 
             # Resumption requires the option's payload
             tip += f"--resume-value {quote(json.dumps(option.payload))}"
@@ -68,16 +70,16 @@ def _print_tips_to_stderr(
     elif run_result.error_message:
         tip += "Graph execution failed. To retry, run:\n"
         tip += "\n"
-        tip += f"    graphexosuit retry "
+        tip += f"    {_get_quoted_program_name()} retry "
 
-        tip += to_cli_args(run_result, liner_class, liner_dir)
+        tip += _to_cli_args(run_result, liner_class, liner_dir)
 
     # else we got no tips
 
     if tip:
         print(tip, file=sys.stderr)  # adds a newline at the end
 
-def to_cli_args(run_result, liner_class, liner_dir):
+def _to_cli_args(run_result, liner_class, liner_dir):
     args = ''
     if liner_class:
         args += f"--liner-class {quote(liner_class)} "
@@ -116,7 +118,6 @@ def run(
     result = core.run(initial_state, thread_id=thread_id)
     _print_result(result)
     _print_tips_to_stderr(result, liner_class, liner_dir)
-
 
 @app.command()
 def resume(
