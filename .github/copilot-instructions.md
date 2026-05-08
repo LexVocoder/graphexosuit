@@ -1,1 +1,1 @@
-#include "code-quality.md"
+Follow the instructions in `.github/code-quality.md`.
