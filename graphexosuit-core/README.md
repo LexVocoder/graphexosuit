@@ -32,7 +32,7 @@ uv run pytest tests/ -v
 # my_project/workflows.py
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
-from graphexosuit import StandardizedInterrupt, InterruptOption, Liner
+from graphexosuit.core import StandardizedInterrupt, InterruptOption, ExosuitLiner
 from langgraph.types import interrupt
 from typing import TypedDict
 
@@ -51,7 +51,7 @@ def approval_node(state):
         return {"value": "approved"}
     return {"value": "rejected"}
 
-class MyWorkflow(Liner):
+class MyWorkflow(ExosuitLiner):
     def __init__(self):
         self._checkpointer = MemorySaver()
 
@@ -70,7 +70,7 @@ class MyWorkflow(Liner):
 ### 2. Use ExosuitCore directly
 
 ```python
-from graphexosuit import ExosuitCore
+from graphexosuit.core import ExosuitCore
 from my_project.workflows import MyWorkflow
 
 core = ExosuitCore(MyWorkflow())

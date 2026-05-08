@@ -7,8 +7,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
 
-from graphexosuit import StandardizedInterrupt, InterruptOption
-from graphexosuit.liner import ExosuitLiner
+from graphexosuit.core import StandardizedInterrupt, InterruptOption, ExosuitLiner
 
 # Graph nodes
 

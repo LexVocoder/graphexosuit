@@ -10,8 +10,7 @@ from urllib.parse import urlencode
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 
-from graphexosuit import ExosuitCore, load_liner
-from graphexosuit.core import RunResult
+from graphexosuit.core import ExosuitCore, load_liner, RunResult
 
 # --------------------------------------------------------------------------
 # Lazily initialise the ExosuitCore from the environment variable.

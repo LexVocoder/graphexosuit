@@ -12,8 +12,7 @@ from dataclasses import asdict
 from shlex import quote
 from typing import Any, Optional
 
-from graphexosuit import ExosuitCore, load_liner
-from graphexosuit.core import RunResult
+from graphexosuit.core import ExosuitCore, load_liner, RunResult
 
 
 app = typer.Typer(

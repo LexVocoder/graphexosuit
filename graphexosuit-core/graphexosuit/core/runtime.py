@@ -125,8 +125,8 @@ class ExosuitCore:
         # Register graphexosuit types with the serializer to prevent deserialization warnings
         checkpointer.serde = JsonPlusSerializer(
             allowed_msgpack_modules=[
-                ("graphexosuit.core", "InterruptOption"),
-                ("graphexosuit.core", "StandardizedInterrupt"),
+                ("graphexosuit.core.runtime", "InterruptOption"),
+                ("graphexosuit.core.runtime", "StandardizedInterrupt"),
             ]
         )
 

@@ -16,14 +16,14 @@ uv pip install ./graphexosuit
 
 **Quick start:**
 ```python
-from graphexosuit import ExosuitCore
+from graphexosuit.core import ExosuitCore
 from my_project.workflows import MyWorkflow
 
 core = ExosuitCore(MyWorkflow())
 result = core.run({"value": "start"}, thread_id="thread-1")
 ```
 
-See [graphexosuit README](graphexosuit/README.md) for full documentation.
+See [graphexosuit-core README](graphexosuit-core/README.md) for full documentation.
 
 ---
 

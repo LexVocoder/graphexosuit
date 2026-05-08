@@ -10,7 +10,7 @@ from typing import Any, TypedDict
 import pytest
 from httpx import AsyncClient, ASGITransport
 
-from graphexosuit.liner import ExosuitLiner
+from graphexosuit.core import ExosuitLiner
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ _fail_call_count: dict[str, int] = {}
 def _get_compiled_graph(checkpointer: Any):
     from langgraph.graph import StateGraph
     from langgraph.types import interrupt
-    from graphexosuit import StandardizedInterrupt, InterruptOption
+    from graphexosuit.core import StandardizedInterrupt, InterruptOption
 
     builder = StateGraph(_State)
 

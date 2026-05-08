@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from graphexosuit.core import RunResult
+from graphexosuit.core.runtime import RunResult
 from langgraph.graph import StateGraph
 from typing import Any, Optional
 

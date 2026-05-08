@@ -9,7 +9,7 @@ from typing import Any, TypedDict
 
 from typer.testing import CliRunner
 
-from graphexosuit.liner import ExosuitLiner
+from graphexosuit.core import ExosuitLiner
 from graphexosuitcli.cli import app
 
 
@@ -30,7 +30,7 @@ _fail_call_count: dict[str, int] = {}
 def _get_compiled_graph():
     from langgraph.graph import StateGraph
     from langgraph.types import interrupt
-    from graphexosuit import StandardizedInterrupt, InterruptOption
+    from graphexosuit.core import StandardizedInterrupt, InterruptOption
 
     builder = StateGraph(_State)
 

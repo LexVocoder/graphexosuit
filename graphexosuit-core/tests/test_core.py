@@ -15,10 +15,10 @@ from graphexosuit.core import (
     InterruptOption,
     RunResult,
     StandardizedInterrupt,
+    ExosuitLiner,
     _validate_run_result,
     _validate_interrupt_value,
 )
-from graphexosuit.liner import ExosuitLiner
 
 
 # ---------------------------------------------------------------------------

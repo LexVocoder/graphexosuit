@@ -6,7 +6,7 @@ import importlib
 import os
 from typing import Any
 
-from graphexosuit.errors import GraphLoaderError
+from graphexosuit.core.errors import GraphLoaderError
 
 _ENV_VAR = "GRAPHEXOSUIT_LINER_CLASS"
 
