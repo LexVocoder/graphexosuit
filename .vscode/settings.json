@@ -3,9 +3,9 @@
   "python.linting.enabled": true,
   "python.linting.pylintEnabled": false,
   "python.analysis.extraPaths": [
-    "${workspaceFolder}/graphexosuit",
-    "${workspaceFolder}/graphexosuitcli",
-    "${workspaceFolder}/graphexosuitweb"
+    "${workspaceFolder}/graphexosuit-core",
+    "${workspaceFolder}/graphexosuit-layer-cli",
+    "${workspaceFolder}/graphexosuit-layer-backend"
   ],
   "[python]": {
     "defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
