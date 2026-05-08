@@ -1,7 +1,6 @@
 curl \
   -v \
-  'http://127.0.0.1:8000/run' \
-  -H 'Content-Type: application/json' \
-  -d '{"input":{"value": 42}}'
+  -X POST \
+  'http://127.0.0.1:8000/run?initial-state=%7B%22value%22%3A%2042%7D'
 
 echo

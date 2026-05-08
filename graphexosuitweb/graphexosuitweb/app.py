@@ -5,10 +5,10 @@ from __future__ import annotations
 import json
 from contextlib import asynccontextmanager
 from dataclasses import asdict
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -86,23 +86,18 @@ def _result_response(result: RunResult) -> JSONResponse:
 
 
 # --------------------------------------------------------------------------
-# Request / response models
-# --------------------------------------------------------------------------
-
-class RunRequest(BaseModel):
-    input: dict
-    thread_id: Optional[str] = None
-
-
-# --------------------------------------------------------------------------
 # Endpoints
 # --------------------------------------------------------------------------
 
 @app.post("/run")
-async def run_endpoint(body: RunRequest) -> JSONResponse:
+async def run_endpoint(
+    initial_state: str = Query(..., description="JSON-encoded initial state"),
+    thread_id: Optional[str] = None,
+) -> JSONResponse:
     """Execute the graph from the beginning."""
     core = _get_core()
-    result = core.run(body.input, thread_id=body.thread_id)
+    state = json.loads(initial_state)
+    result = core.run(state, thread_id=thread_id)
     return _result_response(result)
 
 

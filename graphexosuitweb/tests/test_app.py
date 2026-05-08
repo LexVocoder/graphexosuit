@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import types as _types
 from typing import Any, TypedDict
@@ -108,7 +109,7 @@ async def client():
 
 class TestRunEndpoint:
     async def test_run_to_completion(self, client: AsyncClient):
-        resp = await client.post("/run", json={"input": {"value": "hello"}})
+        resp = await client.post("/run", params={"initial_state": json.dumps({"value": "hello"})})
         assert resp.status_code == 200
         data = resp.json()
         assert data["final_result"] is not None
@@ -116,7 +117,7 @@ class TestRunEndpoint:
 
     async def test_run_with_thread_id(self, client: AsyncClient):
         resp = await client.post(
-            "/run", json={"input": {"value": "hello"}, "thread_id": "my-thread"}
+            "/run", params={"initial_state": json.dumps({"value": "hello"}), "thread_id": "my-thread"}
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -125,7 +126,7 @@ class TestRunEndpoint:
     async def test_run_pauses_on_interrupt(self, client: AsyncClient):
         resp = await client.post(
             "/run",
-            json={"input": {"value": "interrupt_me"}, "thread_id": "web-pause"},
+            params={"initial_state": json.dumps({"value": "interrupt_me"}), "thread_id": "web-pause"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -142,7 +143,7 @@ class TestResumeEndpoint:
     async def _get_paused(self, client: AsyncClient):
         resp = await client.post(
             "/run",
-            json={"input": {"value": "interrupt_me"}, "thread_id": "web-resume"},
+            params={"initial_state": json.dumps({"value": "interrupt_me"}), "thread_id": "web-resume"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -205,7 +206,7 @@ class TestRetryEndpoint:
         # First run fails
         resp = await client.post(
             "/run",
-            json={"input": {"value": "fail_me"}, "thread_id": "web-retry"},
+            params={"initial_state": json.dumps({"value": "fail_me"}), "thread_id": "web-retry"},
         )
         assert resp.status_code == 200
         data = resp.json()

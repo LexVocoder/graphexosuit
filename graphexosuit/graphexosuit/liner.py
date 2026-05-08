@@ -13,10 +13,10 @@ class ExosuitLiner(ABC):
     def get_checkpointer(self) -> Any:
         pass
 
-    def on_retry(self, thread_id: str, checkpoint_id: Optional[str]) -> None:
+    def on_retry(self, thread_id: str, checkpoint_id: str) -> None:
         return
 
-    def transform_initial_state(self, initial_state: Optional[dict]) -> Optional[dict]:
+    def transform_initial_state(self, initial_state: Any) -> Any:
         return initial_state
     
     def transform_resume_value(self, resume_value: Any) -> Any:

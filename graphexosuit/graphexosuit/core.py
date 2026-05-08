@@ -224,7 +224,7 @@ class ExosuitCore:
 
     def run(
         self,
-        initial_state: dict,
+        initial_state: Any,
         thread_id: Optional[str] = None,
     ) -> RunResult:
         """Execute the graph from the beginning.
@@ -232,7 +232,7 @@ class ExosuitCore:
         Parameters
         ----------
         initial_state:
-            Initial state passed to the graph.
+            Initial state passed to the graph, usually a dict.
         thread_id:
             Optional identifier.  A UUID is generated when omitted.
         """
