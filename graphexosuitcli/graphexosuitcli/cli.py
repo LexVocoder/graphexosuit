@@ -95,7 +95,7 @@ def to_cli_args(run_result, liner_class, liner_dir):
 
 @app.command()
 def run(
-    input: str = typer.Option(..., "--input", help="Graph input as a JSON string."),
+    initial_state_json: str = typer.Option(..., "--initial-state", help="Graph input as a JSON string."),
     thread_id: Optional[str] = typer.Option(
         None, "--thread-id", help="Optional thread identifier."
     ),
@@ -108,9 +108,9 @@ def run(
 ) -> None:
     """Run the graph from the beginning."""
     try:
-        initial_state = json.loads(input)
+        initial_state = json.loads(initial_state_json)
     except json.JSONDecodeError as exc:
-        typer.echo(f"Invalid JSON for --input: {exc}", err=True)
+        typer.echo(f"Invalid JSON for --initial-state: {exc}", err=True)
         raise typer.Exit(code=1)
 
     core = _load_core(liner_class=liner_class, liner_dir=liner_dir)
