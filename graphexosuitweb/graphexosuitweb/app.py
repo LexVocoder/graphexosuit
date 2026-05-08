@@ -32,21 +32,9 @@ def _get_core() -> ExosuitCore:
     return _core
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Manage application lifespan: startup and shutdown."""
-    # Startup
-    yield
-    # Shutdown
-    global _core
-    if _core is not None:
-        _core.close()
-
-
 app = FastAPI(
     title="graphexosuitweb",
     description="HTTP interface for executing LangGraph workflows via graphexosuit.",
-    lifespan=lifespan,
 )
 
 
