@@ -3,7 +3,6 @@
 from graphexosuit.core import (
     ExosuitCore,
     InterruptOption,
-    ResumeValue,
     RunResult,
     StandardizedInterrupt,
 )
@@ -14,7 +13,6 @@ from graphexosuit.liner import ExosuitLiner
 __all__ = [
     "ExosuitCore",
     "InterruptOption",
-    "ResumeValue",
     "RunResult",
     "StandardizedInterrupt",
     "ExosuitLiner",

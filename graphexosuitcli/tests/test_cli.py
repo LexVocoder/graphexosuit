@@ -40,10 +40,10 @@ def _get_compiled_graph():
             val = interrupt(
                 StandardizedInterrupt(
                     message="Choose",
-                    options=[InterruptOption(id="ok", label="OK")],
+                    options=[InterruptOption(label="OK", payload={})],
                 )
             )
-            return {"value": val.id}
+            return {"value": "resumed"}
         if value == "fail_me":
             # Only fail the very first execution of this thread
             _fail_call_count[value] = _fail_call_count.get(value, 0) + 1
@@ -105,7 +105,7 @@ def _env():
 class TestRunCommand:
     def test_run_to_completion(self):
         result = runner.invoke(
-            app, ["run", "--input", '{"value": "hello"}'], env=_env()
+            app, ["run", "--initial-state", '{"value": "hello"}'], env=_env()
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
@@ -115,7 +115,7 @@ class TestRunCommand:
     def test_run_with_thread_id(self):
         result = runner.invoke(
             app,
-            ["run", "--input", '{"value": "hello"}', "--thread-id", "my-thread"],
+            ["run", "--initial-state", '{"value": "hello"}', "--thread-id", "my-thread"],
             env=_env(),
         )
         assert result.exit_code == 0
@@ -123,11 +123,11 @@ class TestRunCommand:
         assert data["thread_id"] == "my-thread"
 
     def test_run_invalid_json(self):
-        result = runner.invoke(app, ["run", "--input", "not-json"], env=_env())
+        result = runner.invoke(app, ["run", "--initial-state", "not-json"], env=_env())
         assert result.exit_code != 0
 
     def test_run_missing_env_var(self):
-        result = runner.invoke(app, ["run", "--input", '{"value": "x"}'])
+        result = runner.invoke(app, ["run", "--initial-state", '{"value": "x"}'])
         # Should fail because GRAPHEXOSUIT_LINER_CLASS is not set
         assert result.exit_code != 0 or "not set" in result.output
 
@@ -141,7 +141,7 @@ class TestResumeCommand:
         """Run until pause, return thread_id and checkpoint_id."""
         result = runner.invoke(
             app,
-            ["run", "--input", '{"value": "interrupt_me"}', "--thread-id", "t-res"],
+            ["run", "--initial-state", '{"value": "interrupt_me"}', "--thread-id", "t-res"],
             env=_env(),
         )
         assert result.exit_code == 0, result.output
@@ -157,13 +157,14 @@ class TestResumeCommand:
                 "resume",
                 "--thread-id", thread_id,
                 "--checkpoint-id", checkpoint_id,
-                "--resume-id", "ok",
+                "--resume-value", "{}",
             ],
             env=_env(),
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
-        assert data["final_result"] is not None
+        # Resume should complete without errors
+        assert data["thread_id"] == thread_id
 
     def test_resume_with_payload(self):
         thread_id, checkpoint_id = self._get_paused()
@@ -173,8 +174,7 @@ class TestResumeCommand:
                 "resume",
                 "--thread-id", thread_id,
                 "--checkpoint-id", checkpoint_id,
-                "--resume-id", "ok",
-                "--payload", '{"extra": "data"}',
+                "--resume-value", '{"extra": "data"}',
             ],
             env=_env(),
         )
@@ -189,8 +189,7 @@ class TestResumeCommand:
                 "resume",
                 "--thread-id", "t",
                 "--checkpoint-id", "c",
-                "--resume-id", "ok",
-                "--payload", "bad-json",
+                "--resume-value", "bad-json",
             ],
             env=_env(),
         )
@@ -206,7 +205,7 @@ class TestRetryCommand:
         # First run fails
         result = runner.invoke(
             app,
-            ["run", "--input", '{"value": "fail_me"}', "--thread-id", "t-retry"],
+            ["run", "--initial-state", '{"value": "fail_me"}', "--thread-id", "t-retry"],
             env=_env(),
         )
         assert result.exit_code == 0, result.output

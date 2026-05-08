@@ -10,9 +10,9 @@ import sys
 import typer
 from dataclasses import asdict
 from shlex import quote
-from typing import Optional
+from typing import Any, Optional
 
-from graphexosuit import ExosuitCore, load_liner, ResumeValue
+from graphexosuit import ExosuitCore, load_liner
 from graphexosuit.core import RunResult
 
 
@@ -62,10 +62,8 @@ def _print_tips_to_stderr(
             tip += f"graphexosuit resume "
             tip += to_cli_args(run_result, liner_class, liner_dir)
 
-            # Resumption requires arguments from the given option
-            tip += f"--resume-id {quote(option.id)} "
-            if option.payload is not None:
-                tip += f"--payload {quote(json.dumps(option.payload))}"
+            # Resumption requires the option's payload
+            tip += f"--resume-value {quote(json.dumps(option.payload))}"
 
     elif run_result.error_message:
         tip += "Graph execution failed. To retry, run:\n"
@@ -124,10 +122,7 @@ def run(
 def resume(
     thread_id: str = typer.Option(..., "--thread-id", help="Thread identifier."),
     checkpoint_id: str = typer.Option(..., "--checkpoint-id", help="Checkpoint identifier."),
-    resume_id: str = typer.Option(..., "--resume-id", help="Selected option ID."),
-    payload: Optional[str] = typer.Option(
-        None, "--payload", help="Optional payload as a JSON string."
-    ),
+    resume_value_json: str = typer.Option(..., "--resume-value", help="Resume value as JSON."),
     liner_class: Optional[str] = typer.Option(
         None, "--liner-class", help="Optional liner class to use in package:class format (e.g. 'my_package:MyLiner'). Overrides GRAPHEXOSUIT_LINER_CLASS environment variable."
     ),
@@ -136,17 +131,15 @@ def resume(
     ),
 ) -> None:
     """Resume a paused graph execution."""
-    payload_data: Optional[dict] = None
-    if payload is not None:
-        try:
-            payload_data = json.loads(payload)
-        except json.JSONDecodeError as exc:
-            typer.echo(f"Invalid JSON for --payload: {exc}", err=True)
-            raise typer.Exit(code=1)
+    resume_value: Any = None
+    try:
+        resume_value = json.loads(resume_value_json)
+    except json.JSONDecodeError as exc:
+        typer.echo(f"Invalid JSON for --resume-value: {exc}", err=True)
+        raise typer.Exit(code=1)
 
     core = _load_core(liner_class=liner_class, liner_dir=liner_dir)
 
-    resume_value = ResumeValue(id=resume_id, payload=payload_data)
     result = core.resume(thread_id, checkpoint_id, resume_value)
     _print_result(result)
     _print_tips_to_stderr(result, liner_class, liner_dir)

@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from graphexosuit import ExosuitCore, ResumeValue, load_liner
+from graphexosuit import ExosuitCore, load_liner
 from graphexosuit.core import RunResult
 
 # --------------------------------------------------------------------------
@@ -61,11 +61,8 @@ def _result_response(result: RunResult) -> JSONResponse:
             params = {
                 'thread_id': result.thread_id,
                 'checkpoint_id': result.checkpoint_id,
-                'resume_id': option.id,
+                'resume_value': json.dumps(option.payload),
             }
-
-            if (option.payload is not None):
-                params['payload'] = json.dumps(option.payload)
 
             url = f"/resume?{urlencode(params)}"
 
@@ -116,7 +113,7 @@ async def resume_get() -> JSONResponse:
         content={
             "detail": (
                 "Resume requires POST. Use POST /resume with "
-                "thread_id, checkpoint_id, and resume_id in query parameters."
+                "thread_id, checkpoint_id, and resume_value in query parameters."
             )
         },
     )
@@ -126,23 +123,19 @@ async def resume_get() -> JSONResponse:
 async def resume_endpoint(
     thread_id: str,
     checkpoint_id: str,
-    resume_id: str,
-    payload: Optional[str] = None,
+    resume_value: str,
 ) -> JSONResponse:
     """Resume a paused graph execution."""
-    payload_data: Optional[dict] = None
-    if payload is not None:
-        try:
-            payload_data = json.loads(payload)
-        except json.JSONDecodeError:
-            return JSONResponse(
-                status_code=422,
-                content={"detail": "payload must be valid JSON"},
-            )
+    try:
+        resume_value_parsed = json.loads(resume_value)
+    except json.JSONDecodeError:
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "resume_value must be valid JSON"},
+        )
 
     core = _get_core()
-    resume_value = ResumeValue(id=resume_id, payload=payload_data)
-    result = core.resume(thread_id, checkpoint_id, resume_value)
+    result = core.resume(thread_id, checkpoint_id, resume_value_parsed)
     return _result_response(result)
 
 

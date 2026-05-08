@@ -16,12 +16,11 @@ from typing import Any, Optional
 class InterruptOption:
     """A selectable option presented to the user during a graph interrupt.
 
-    Duck-typed: any object with ``id``, ``label``, and optional ``payload`` works.
+    Duck-typed: any object with ``label`` and ``payload`` attributes works.
     """
 
-    id: str
     label: str
-    payload: Optional[dict] = None
+    payload: Any
 
 
 @dataclass
@@ -33,17 +32,6 @@ class StandardizedInterrupt:
 
     message: str
     options: list[InterruptOption]
-
-
-@dataclass
-class ResumeValue:
-    """The value sent back to a paused node when resuming execution.
-
-    Duck-typed: any object with ``id`` and ``payload`` attributes works.
-    """
-
-    id: str
-    payload: Optional[dict] = None
 
 
 @dataclass
@@ -97,18 +85,10 @@ def _validate_interrupt_value(value: Any) -> None:
             "Interrupt must have 'message' and 'options' attributes"
         )
     for option in value.options:
-        if not (hasattr(option, "id") and hasattr(option, "label")):
+        if not (hasattr(option, "label") and hasattr(option, "payload")):
             raise ValueError(
-                "Each interrupt option must have 'id' and 'label' attributes"
+                "Each interrupt option must have 'label' and 'payload' attributes"
             )
-
-
-def _validate_resume_value(value: Any) -> None:
-    """Raise ValueError if *value* does not satisfy the ResumeValue duck type."""
-    if not (hasattr(value, "id") and hasattr(value, "payload")):
-        raise ValueError(
-            "ResumeValue must have 'id' and 'payload' attributes"
-        )
 
 
 def _extract_checkpoint_id(graph: Any, config: dict) -> Optional[str]:
@@ -145,7 +125,6 @@ class ExosuitCore:
         # Register graphexosuit types with the serializer to prevent deserialization warnings
         checkpointer.serde = JsonPlusSerializer(
             allowed_msgpack_modules=[
-                ("graphexosuit.core", "ResumeValue"),
                 ("graphexosuit.core", "InterruptOption"),
                 ("graphexosuit.core", "StandardizedInterrupt"),
             ]
@@ -281,32 +260,11 @@ class ExosuitCore:
         checkpoint_id:
             Checkpoint to resume from.
         resume_value:
-            Duck-typed ResumeValue with ``.id`` and ``.payload`` attributes.
+            The payload to send back to the paused node (typically a dict).
         """
-
-        try:
-            _validate_resume_value(resume_value)
-        except ValueError as exc:
-            # Client did not provide a well-formed resume value.
-            # Don't log stack trace to stderr, because it's a client error.
-            return self._build_run_result(
-                thread_id=thread_id,
-                checkpoint_id=checkpoint_id,
-                error_message=f"Given resume value is not well-formed: {exc}",
-            )
 
         if hasattr(self._liner, "transform_resume_value"):
             resume_value = self._liner.transform_resume_value(resume_value)
-            try:
-                _validate_resume_value(resume_value)
-            except ValueError as exc:
-                # Transformed resume value is not well-formed.
-                return self._log_and_create_error_result(
-                    exc=exc,
-                    thread_id=thread_id,
-                    error_prefix=f"Transformed resume value is not well-formed",
-                    checkpoint_id=checkpoint_id,
-                )
 
         config = {
             "configurable": {

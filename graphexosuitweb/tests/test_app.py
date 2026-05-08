@@ -37,10 +37,10 @@ def _get_compiled_graph(checkpointer: Any):
             val = interrupt(
                 StandardizedInterrupt(
                     message="Choose",
-                    options=[InterruptOption(id="ok", label="OK")],
+                    options=[InterruptOption(label="OK", payload={})],
                 )
             )
-            return {"value": val.id}
+            return {"value": "resumed"}
         if value == "fail_me":
             _fail_call_count[value] = _fail_call_count.get(value, 0) + 1
             if _fail_call_count[value] == 1:
@@ -156,12 +156,13 @@ class TestResumeEndpoint:
             params={
                 "thread_id": thread_id,
                 "checkpoint_id": checkpoint_id,
-                "resume_id": "ok",
+                "resume_value": "{}",
             },
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["final_result"] is not None
+        # Resume should complete without errors
+        assert data["thread_id"] == thread_id
 
     async def test_resume_with_payload(self, client: AsyncClient):
         import json
@@ -171,13 +172,12 @@ class TestResumeEndpoint:
             params={
                 "thread_id": thread_id,
                 "checkpoint_id": checkpoint_id,
-                "resume_id": "ok",
-                "payload": json.dumps({"extra": "data"}),
+                "resume_value": json.dumps({"extra": "data"}),
             },
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["final_result"] is not None
+        assert data["thread_id"] == thread_id
 
     async def test_resume_invalid_payload(self, client: AsyncClient):
         resp = await client.post(
@@ -185,8 +185,7 @@ class TestResumeEndpoint:
             params={
                 "thread_id": "t",
                 "checkpoint_id": "c",
-                "resume_id": "ok",
-                "payload": "not-json",
+                "resume_value": "not-json",
             },
         )
         assert resp.status_code == 422

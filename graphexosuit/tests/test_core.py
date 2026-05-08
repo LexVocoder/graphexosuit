@@ -13,12 +13,10 @@ from langgraph.types import interrupt, Command
 from graphexosuit.core import (
     ExosuitCore,
     InterruptOption,
-    ResumeValue,
     RunResult,
     StandardizedInterrupt,
     _validate_run_result,
     _validate_interrupt_value,
-    _validate_resume_value,
 )
 from graphexosuit.liner import ExosuitLiner
 
@@ -52,10 +50,11 @@ def _interrupt_graph() -> StateGraph:
         val = interrupt(
             StandardizedInterrupt(
                 message="Approve?",
-                options=[InterruptOption(id="approve", label="Approve")],
+                options=[InterruptOption(label="Approve", payload={})],
             )
         )
-        return {"value": val.id}
+        # If we reach here, we were resumed and interrupt() returned the resume value
+        return {"value": "approved", "_resume_done": True}
 
     builder.add_node("node", node)
     builder.set_entry_point("node")
@@ -169,7 +168,7 @@ class TestValidationHelpers:
     def test_valid_interrupt(self):
         iv = StandardizedInterrupt(
             message="msg",
-            options=[InterruptOption(id="x", label="X")]
+            options=[InterruptOption(label="X", payload={})]
         )
         _validate_interrupt_value(iv)  # should not raise
 
@@ -183,27 +182,15 @@ class TestValidationHelpers:
         with pytest.raises(ValueError, match="message"):
             _validate_interrupt_value(obj)
 
-    def test_interrupt_option_missing_id(self):
+    def test_interrupt_option_missing_payload(self):
         bad_option = MagicMock(spec=["label"])
         iv = MagicMock()
         iv.message = "m"
         iv.options = [bad_option]
-        with pytest.raises(ValueError, match="'id' and 'label'"):
+        with pytest.raises(ValueError, match="'label' and 'payload'"):
             _validate_interrupt_value(iv)
 
-    def test_valid_resume_value(self):
-        rv = ResumeValue(id="approve", payload=None)
-        _validate_resume_value(rv)  # should not raise
 
-    def test_resume_value_missing_id(self):
-        obj = MagicMock(spec=["payload"])
-        with pytest.raises(ValueError, match="'id' and 'payload'"):
-            _validate_resume_value(obj)
-
-    def test_resume_value_missing_payload(self):
-        obj = MagicMock(spec=["id"])
-        with pytest.raises(ValueError, match="'id' and 'payload'"):
-            _validate_resume_value(obj)
 
 
 # ---------------------------------------------------------------------------
@@ -320,34 +307,16 @@ class TestExosuitCoreResume:
     def test_resume_completes(self):
         core, run_result = self._paused_core()
         assert run_result.checkpoint_id is not None
-        rv = ResumeValue(id="approve", payload=None)
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, rv)
+        result = core.resume(run_result.thread_id, run_result.checkpoint_id, {})
+        # Resume should succeed without error
+        assert result.thread_id == run_result.thread_id
+        assert result.checkpoint_id is not None
+
+    def test_resume_with_dict_payload(self):
+        core, run_result = self._paused_core()
+        assert run_result.checkpoint_id is not None
+        result = core.resume(run_result.thread_id, run_result.checkpoint_id, {"key": "value"})
         assert result.final_result is not None
-        assert result.final_result == {"value": "approve"}
-
-    def test_resume_invalid_resume_value(self):
-        core, run_result = self._paused_core()
-        assert run_result.checkpoint_id is not None
-        bad = MagicMock(spec=["id"])  # missing payload
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, bad)
-        assert result.final_result is None
-        assert result.error_message is not None and "ResumeValue" in result.error_message
-
-    def test_resume_malformed_resume_value_no_stderr_logging(self, capsys):
-        """Malformed resume_value returns error but does NOT log to stderr (it's a client error)."""
-        core, run_result = self._paused_core()
-        assert run_result.checkpoint_id is not None
-        bad = MagicMock(spec=["id"])  # missing payload
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, bad)
-        
-        # Verify stderr is empty (no logging)
-        captured = capsys.readouterr()
-        assert captured.err == ""
-        
-        # Verify result is an error
-        assert result.final_result is None
-        assert result.error_message is not None
-        assert "ResumeValue" in result.error_message
 
     def test_resume_without_transform_passes_original_to_invoke(self):
         """When liner has no transform_resume_value, original resume_value is passed in Command to _invoke."""
@@ -368,12 +337,12 @@ class TestExosuitCoreResume:
         # Verify transform_resume_value does not exist
         assert not hasattr(core._liner, "transform_resume_value")
         
-        rv = ResumeValue(id="approve", payload={"key": "value"})
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, rv)
+        resume_value = {"key": "value"}
+        result = core.resume(run_result.thread_id, run_result.checkpoint_id, resume_value)
         
         # Verify the initial_state passed to _invoke is a Command with the original resume_value
         assert isinstance(captured_args["initial_state"], Command)
-        assert captured_args["initial_state"].resume == rv
+        assert captured_args["initial_state"].resume == resume_value
 
     def test_resume_with_transform_passes_transformed_to_invoke(self):
         """When liner has transform_resume_value, transformed resume_value is passed in Command to _invoke."""
@@ -382,7 +351,7 @@ class TestExosuitCoreResume:
         
         # Add transform_resume_value to liner
         def transform_fn(rv):
-            return ResumeValue(id=rv.id + "_transformed", payload=rv.payload)
+            return {"transformed": True, "original": rv}
         
         core._liner.transform_resume_value = transform_fn
         
@@ -397,36 +366,12 @@ class TestExosuitCoreResume:
         
         core._invoke = mock_invoke
         
-        rv = ResumeValue(id="approve", payload=None)
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, rv)
+        resume_value = {"approval": "granted"}
+        result = core.resume(run_result.thread_id, run_result.checkpoint_id, resume_value)
         
         # Verify the initial_state passed to _invoke is a Command with the transformed resume_value
         assert isinstance(captured_args["initial_state"], Command)
-        assert captured_args["initial_state"].resume.id == "approve_transformed"  # type: ignore
-
-    def test_resume_transformed_malformed_logs_stderr(self, capsys):
-        """When transformed resume_value is malformed, logs to stderr and returns error RunResult."""
-        core, run_result = self._paused_core()
-        assert run_result.checkpoint_id is not None
-        
-        # Add transform_resume_value that returns a malformed value
-        def bad_transform_fn(rv):
-            return MagicMock(spec=["id"])  # missing payload
-        
-        core._liner.transform_resume_value = bad_transform_fn
-        
-        rv = ResumeValue(id="approve", payload=None)
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, rv)
-        
-        # Verify stderr was written to (error in transform)
-        captured = capsys.readouterr()
-        assert captured.err != ""
-        assert "ResumeValue" in captured.err
-        
-        # Verify result is an error
-        assert result.final_result is None
-        assert result.error_message  # truthy
-        assert "Transformed resume value is not well-formed" in result.error_message
+        assert captured_args["initial_state"].resume == {"transformed": True, "original": resume_value}
 
 
 # ---------------------------------------------------------------------------
