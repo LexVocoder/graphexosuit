@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-from contextlib import asynccontextmanager
 from dataclasses import asdict
-from typing import Any, Optional
+from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import FastAPI, Request, Query
+from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
 from graphexosuit import ExosuitCore, load_liner
 from graphexosuit.core import RunResult
