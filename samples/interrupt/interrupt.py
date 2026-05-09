@@ -49,14 +49,9 @@ class InterruptLiner(ExosuitLiner):
         path_to_db = os.path.join(cache_dir, "checkpoints.db")
 
         self._checkpointer_cm = SqliteSaver.from_conn_string(path_to_db)
-        self._checkpointer = self._checkpointer_cm.__enter__()
 
-    def __del__(self):
-        if hasattr(self, '_checkpointer_cm'):
-            self._checkpointer_cm.__exit__(None, None, None)
-
-    def get_checkpointer(self) -> Any:
-        return self._checkpointer
+    def get_checkpointer_cm(self) -> Any:
+        return self._checkpointer_cm
 
     def get_graph(self) -> StateGraph:
         builder = StateGraph(SimpleState)

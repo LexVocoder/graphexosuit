@@ -58,6 +58,18 @@ from langgraph.checkpoint.memory import MemorySaver as _MemorySaver
 _shared_checkpointer = _MemorySaver()
 
 
+class _CheckpointerContextManager:
+    """Simple context manager wrapper for a checkpointer."""
+    def __init__(self, checkpointer):
+        self._checkpointer = checkpointer
+    
+    def __enter__(self):
+        return self._checkpointer
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass  # No cleanup needed for MemorySaver
+
+
 def _get_checkpointer():
     return _shared_checkpointer
 
@@ -66,10 +78,10 @@ class _TestLiner(ExosuitLiner):
     """Liner-compatible class for testing."""
 
     def get_graph(self) -> Any:
-        return _get_graph(self.get_checkpointer())
+        return _get_graph(self.get_checkpointer_cm().__enter__())
 
-    def get_checkpointer(self) -> Any:
-        return _get_checkpointer()
+    def get_checkpointer_cm(self) -> Any:
+        return _CheckpointerContextManager(_get_checkpointer())
 
 
 _FAKE_MODULE = "fake_web_graph_module"

@@ -3,7 +3,7 @@ from graphexosuit.core.runtime import RunResult
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
 from langgraph.graph.state import CompiledStateGraph
-from typing import Any
+from typing import Any, Iterator
 
 
 class ExosuitLiner(ABC):
@@ -12,7 +12,7 @@ class ExosuitLiner(ABC):
         pass
 
     @abstractmethod
-    def get_checkpointer(self) -> BaseCheckpointSaver:
+    def get_checkpointer_cm(self) -> Iterator[BaseCheckpointSaver]:
         pass
 
     def on_retry(self, thread_id: str, checkpoint_id: str) -> None:

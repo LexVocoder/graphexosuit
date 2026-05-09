@@ -31,7 +31,7 @@ uv run pytest tests/ -v
 ```python
 # my_project/workflows.py
 from langgraph.graph import StateGraph
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from graphexosuit.core import StandardizedInterrupt, InterruptOption, ExosuitLiner
 from langgraph.types import interrupt
 from typing import TypedDict
@@ -54,7 +54,7 @@ def approval_node(state):
 
 class MyWorkflow(ExosuitLiner):
     def __init__(self):
-        self._checkpointer = MemorySaver()
+        pass
 
     def get_graph(self):
         """Return a StateGraph or a compiled StateGraph."""
@@ -64,8 +64,8 @@ class MyWorkflow(ExosuitLiner):
         builder.set_finish_point("approval")
         return builder
 
-    def get_checkpointer(self):
-        return self._checkpointer
+    def get_checkpointer_cm(self):
+        return SqliteSaver.from_conn_string(...)
 ```
 
 ### 2. Use ExosuitCore directly
@@ -99,7 +99,7 @@ print(result)
 ## Graph developer contract
 
 * `get_graph()` must return a `StateGraph` or a compiled `StateGraph`.
-* `get_checkpointer()` must return a LangGraph checkpointer.
+* `get_checkpointer_cm()` must return a context manager that yields a LangGraph checkpointer ("Saver").
 * Interrupt with `interrupt(StandardizedInterrupt(...))`.
 
 ## Environment variable

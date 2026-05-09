@@ -101,19 +101,21 @@ class ExosuitCore:
     """Thin runtime wrapper around a LangGraph workflow.
 
     The constructor accepts a Liner-compatible instance that exposes
-    ``get_graph()`` and ``get_checkpointer()`` methods.
+    ``get_graph()`` and ``get_checkpointer_cm()`` methods.
 
     Parameters
     ----------
     liner:
         A Liner-compatible instance that provides ``get_graph()`` and
-        ``get_checkpointer()`` methods.
+        ``get_checkpointer_cm()`` methods.
     """
     def __init__(self, liner: Any) -> None:
         self._liner = liner
         graph = liner.get_graph()
         
-        checkpointer = liner.get_checkpointer()
+        # Enter the checkpointer context manager and store it for cleanup in __del__
+        self._checkpointer_cm = liner.get_checkpointer_cm()
+        checkpointer = self._checkpointer_cm.__enter__()
 
         if isinstance(graph, StateGraph):
             # Compile it for them
@@ -128,6 +130,11 @@ class ExosuitCore:
                 ("graphexosuit.core.runtime", "StandardizedInterrupt"),
             ]
         )
+
+    def __del__(self) -> None:
+        """Exit the checkpointer context manager on cleanup."""
+        if hasattr(self, '_checkpointer_cm'):
+            self._checkpointer_cm.__exit__(None, None, None)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -302,5 +309,5 @@ class ExosuitCore:
             }
         }
 
-        # None is a magic value meaning "resume"
+        # None is a magic value meaning "resume from last checkpoint"
         return self._invoke(None, config)

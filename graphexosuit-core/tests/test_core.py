@@ -94,6 +94,19 @@ def _invalid_interrupt_graph() -> StateGraph:
     return builder
 
 
+# Helper: simple context manager wrapper for checkpointer
+class _CheckpointerContextManager:
+    """Simple context manager wrapper for a checkpointer."""
+    def __init__(self, checkpointer):
+        self._checkpointer = checkpointer
+    
+    def __enter__(self):
+        return self._checkpointer
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass  # No cleanup needed for MemorySaver
+
+
 # Helper to create a TestLiner that properly compiles graphs
 def _make_core(uncompiled_graph_thunk, precompile=True) -> ExosuitCore:
     """Create ExosuitCore with a TestLiner.
@@ -118,8 +131,8 @@ def _make_core(uncompiled_graph_thunk, precompile=True) -> ExosuitCore:
                 # Return raw StateGraph (ExosuitCore will compile it)
                 return graph
 
-        def get_checkpointer(self) -> Any:
-            return checkpointer
+        def get_checkpointer_cm(self) -> Any:
+            return _CheckpointerContextManager(checkpointer)
 
     return ExosuitCore(TestLiner())
 
@@ -594,8 +607,8 @@ class TestExosuitCoreCompile:
             def get_graph(self) -> Any:
                 return compiled
 
-            def get_checkpointer(self) -> Any:
-                return checkpointer
+            def get_checkpointer_cm(self) -> Any:
+                return _CheckpointerContextManager(checkpointer)
 
         core = ExosuitCore(TestLiner())
         result = core.run({"value": "test"})
@@ -613,8 +626,8 @@ class TestExosuitCoreCompile:
             def get_graph(self) -> Any:
                 return uncompiled
 
-            def get_checkpointer(self) -> Any:
-                return checkpointer
+            def get_checkpointer_cm(self) -> Any:
+                return _CheckpointerContextManager(checkpointer)
 
         # Should not raise; ExosuitCore should compile it for us
         core = ExosuitCore(TestLiner())
@@ -631,8 +644,8 @@ class TestExosuitCoreCompile:
             def get_graph(self) -> Any:
                 return uncompiled
 
-            def get_checkpointer(self) -> Any:
-                return checkpointer
+            def get_checkpointer_cm(self) -> Any:
+                return _CheckpointerContextManager(checkpointer)
 
         core = ExosuitCore(TestLiner())
         # Run and pause to verify checkpointer is set up correctly
