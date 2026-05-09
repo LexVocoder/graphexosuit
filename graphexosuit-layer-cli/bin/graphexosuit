@@ -1,8 +1,0 @@
-#!/bin/bash
-
-# PACKAGE_ROOT is the top `graphexosuitcli` directory.
-# One dirname gives us `bin`, the other gives us `graphexosuitcli`.
-PACKAGE_ROOT="$(dirname $(dirname $(realpath $0)))"
-
-# Use --project flag to tell uv where to find graphexosuitcli's dependencies
-exec uv run --project "$PACKAGE_ROOT" "${PACKAGE_ROOT}/graphexosuitcli/cli.py" "$@"

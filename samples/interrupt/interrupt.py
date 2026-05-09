@@ -62,3 +62,8 @@ class InterruptLiner(ExosuitLiner):
         builder.add_edge("initialize", "node")
         builder.set_finish_point("node")
         return builder
+
+if __name__ == "__main__":
+    from graphexosuit.layer.cli import main
+    os.environ["GRAPHEXOSUIT_LINER_CLASS"] = f"interrupt:{InterruptLiner.__name__}"
+    main()
