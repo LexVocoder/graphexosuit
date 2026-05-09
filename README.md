@@ -56,7 +56,9 @@ uv pip install ./graphexosuit-layer-backend
 **Usage:**
 ```bash
 export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
-uvicorn graphexosuit.layer.backend:app --host 0.0.0.0 --port 8000
+graphexosuitweb
+# or alternatively:
+uvicorn graphexosuit.layer.backend.app:app --host 0.0.0.0 --port 8000
 ```
 
 See [graphexosuit-layer-backend README](graphexosuit-layer-backend/README.md) for full documentation.

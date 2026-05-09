@@ -83,7 +83,7 @@ sys.modules[_FAKE_MODULE] = _fake_mod
 # ---------------------------------------------------------------------------
 
 import os
-import graphexosuitweb.app as _web_app_module
+import graphexosuit.layer.backend.app as _web_app_module
 
 
 @pytest.fixture(autouse=True)
@@ -97,7 +97,7 @@ def reset_core(monkeypatch):
 
 @pytest.fixture
 async def client():
-    from graphexosuitweb.app import app
+    from graphexosuit.layer.backend.app import app
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac

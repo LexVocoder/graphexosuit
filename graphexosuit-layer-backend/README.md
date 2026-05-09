@@ -1,39 +1,39 @@
-# graphexosuitweb
+# graphexosuit-layer-backend
 
-FastAPI web service for [graphexosuit](../graphexosuit) — execute, pause, resume, and retry LangGraph workflows over HTTP.
+FastAPI web service for [graphexosuit-core](../graphexosuit-core) — execute, resume, and retry LangGraph workflows over HTTP.
 
 ## Installation
 
 ```bash
-pip install graphexosuitweb
+pip install graphexosuit-layer-backend
 ```
 
 ## Configuration
 
 ```bash
-export LANGGRAPH_GRAPH_MODULE=my_project.workflows
+export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
 ```
 
 ## Running the server
 
 ```bash
-uvicorn graphexosuitweb.app:app --host 0.0.0.0 --port 8000
+graphexosuitweb
+# or alternatively:
+uvicorn graphexosuit.layer.backend.app:app --host 0.0.0.0 --port 8000
 ```
 
 ## Endpoints
 
 ### `POST /run`
 
-```json
-{ "input": { "value": "start" }, "thread_id": "optional-id" }
-```
+Query parameters: `initial_state` (required JSON string), `thread_id` (optional).
 
 ### `POST /resume`
 
-Query parameters: `thread_id`, `checkpoint_id`, `resume_id`, `payload` (optional JSON string).
+Query parameters: `thread_id` (required), `checkpoint_id` (required), `resume_value` (required JSON string).
 
 ### `POST /retry`
 
-Query parameters: `thread_id`, `checkpoint_id`.
+Query parameters: `thread_id` (required), `checkpoint_id` (required).
 
-All endpoints return a `RunResult` JSON object.  GET requests to `/resume` and `/retry` return HTTP 405.
+All endpoints return a `RunResult` JSON object. GET requests to `/resume` and `/retry` return HTTP 405, because they are not guaranteed to be idempotent.

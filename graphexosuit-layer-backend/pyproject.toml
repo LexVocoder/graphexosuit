@@ -19,7 +19,7 @@ dev = [
 ]
 
 [project.scripts]
-graphexosuitweb = "graphexosuitweb._server:main"
+graphexosuitweb = "graphexosuit.layer.backend._server:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
