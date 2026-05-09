@@ -38,6 +38,9 @@ class SimpleState(TypedDict):
 
 class InterruptLiner(ExosuitLiner):
     def __init__(self):
+        pass
+
+    def get_checkpointer_cm(self) -> Any:
         # Cross-platform parent of the .cache directory
         cache_dir = os.path.join(
             os.getenv("LOCALAPPDATA", os.path.expanduser("~")),
@@ -48,10 +51,7 @@ class InterruptLiner(ExosuitLiner):
 
         path_to_db = os.path.join(cache_dir, "checkpoints.db")
 
-        self._checkpointer_cm = SqliteSaver.from_conn_string(path_to_db)
-
-    def get_checkpointer_cm(self) -> Any:
-        return self._checkpointer_cm
+        return SqliteSaver.from_conn_string(path_to_db)
 
     def get_graph(self) -> StateGraph:
         builder = StateGraph(SimpleState)
