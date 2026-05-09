@@ -1,3 +1,9 @@
+#!/usr/bin/env -S uv run
+
+# # interrupt.py
+
+"""Graph that demonstrates a node that calls interrupt(), wrapped in a command-line interface that allows for resuming after the interrupt."""
+
 from __future__ import annotations
 
 import os
