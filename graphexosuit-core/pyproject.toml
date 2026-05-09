@@ -1,9 +1,13 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "graphexosuit-core"
 version = "0.1.0"
 description = "Lightweight, flexible framework for executing LangGraphs from web or CLI"
 readme = "README.md"
-license = { text = "MIT" }
+license = "Apache-2.0"
 requires-python = ">=3.10"
 dependencies = [
     "langgraph>=1.0.0",
@@ -18,3 +22,6 @@ dev = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["graphexosuit"]
