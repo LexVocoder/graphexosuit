@@ -98,30 +98,29 @@ def _extract_checkpoint_id(graph: Any, config: dict) -> Optional[str]:
 
 
 class ExosuitCore:
-    """Thin runtime wrapper around a compiled LangGraph workflow.
+    """Thin runtime wrapper around a LangGraph workflow.
 
     The constructor accepts a Liner-compatible instance that exposes
-    ``get_compiled_graph()`` and ``get_checkpointer()`` methods.
+    ``get_graph()`` and ``get_checkpointer()`` methods.
 
     Parameters
     ----------
     liner:
-        A Liner-compatible instance that provides ``get_compiled_graph()`` and
+        A Liner-compatible instance that provides ``get_graph()`` and
         ``get_checkpointer()`` methods.
     """
     def __init__(self, liner: Any) -> None:
         self._liner = liner
-        self._graph_app = liner.get_compiled_graph()
-        
-        # Verify that the graph is compiled, not a bare StateGraph
-        if isinstance(self._graph_app, StateGraph):
-            raise ValueError(
-                "ExosuitCore requires a compiled graph, not a StateGraph. "
-                "Ensure your Liner's get_compiled_graph() calls .compile(checkpointer=...) on the graph."
-            )
+        graph = liner.get_graph()
         
         checkpointer = liner.get_checkpointer()
-        
+
+        if isinstance(graph, StateGraph):
+            # Compile it for them
+            self._graph_app = graph.compile(checkpointer=checkpointer)
+        else:
+            self._graph_app = graph
+
         # Register graphexosuit types with the serializer to prevent deserialization warnings
         checkpointer.serde = JsonPlusSerializer(
             allowed_msgpack_modules=[

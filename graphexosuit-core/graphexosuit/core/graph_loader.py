@@ -18,13 +18,13 @@ def load_liner() -> Any:
     variable using the format ``"module.path:ClassName"``
     (e.g. ``"my_project.workflows:MyWorkflow"``).
 
-    The returned instance must have ``get_compiled_graph()`` and ``get_checkpointer()``
+    The returned instance must have ``get_graph()`` and ``get_checkpointer()``
     methods (duck typing; no strict subclass check required).
 
     Returns
     -------
     Any
-        An instantiated object with ``get_compiled_graph()`` and ``get_checkpointer()`` methods.
+        An instantiated object with ``get_graph()`` and ``get_checkpointer()`` methods.
 
     Raises
     ------

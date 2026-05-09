@@ -6,7 +6,7 @@ from typing import Any, Optional
 
 class ExosuitLiner(ABC):
     @abstractmethod
-    def get_compiled_graph(self) -> Any:
+    def get_graph(self) -> Any:
         pass
 
     @abstractmethod

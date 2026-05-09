@@ -27,7 +27,7 @@ class _State(TypedDict):
 _fail_call_count: dict[str, int] = {}
 
 
-def _get_compiled_graph():
+def _get_graph():
     from langgraph.graph import StateGraph
     from langgraph.types import interrupt
     from graphexosuit.core import StandardizedInterrupt, InterruptOption
@@ -69,8 +69,8 @@ def _get_checkpointer():
 class _TestLiner(ExosuitLiner):
     """Liner-compatible class for testing."""
 
-    def get_compiled_graph(self) -> Any:
-        return _get_compiled_graph()
+    def get_graph(self) -> Any:
+        return _get_graph()
 
     def get_checkpointer(self) -> Any:
         return _get_checkpointer()

@@ -95,17 +95,31 @@ def _invalid_interrupt_graph() -> StateGraph:
 
 
 # Helper to create a TestLiner that properly compiles graphs
-def _make_core(uncompiled_graph_thunk) -> ExosuitCore:
+def _make_core(uncompiled_graph_thunk, precompile=True) -> ExosuitCore:
+    """Create ExosuitCore with a TestLiner.
+    
+    Parameters
+    ----------
+    uncompiled_graph_thunk:
+        Callable that returns a StateGraph.
+    precompile:
+        If True, get_graph() returns a pre-compiled graph.
+        If False, get_graph() returns the raw StateGraph (for testing that ExosuitCore compiles it automatically).
+    """
     checkpointer = MemorySaver()
     
     class TestLiner:
-        def get_compiled_graph(self) -> Any:
-            # Compile the graph with the checkpointer
+        def get_graph(self) -> Any:
             graph = uncompiled_graph_thunk()
-            return graph.compile(checkpointer=checkpointer)
+            if precompile:
+                # Return pre-compiled graph
+                return graph.compile(checkpointer=checkpointer)
+            else:
+                # Return raw StateGraph (ExosuitCore will compile it)
+                return graph
 
         def get_checkpointer(self) -> Any:
-            return MemorySaver()
+            return checkpointer
 
     return ExosuitCore(TestLiner())
 
@@ -565,57 +579,67 @@ class TestExosuitCoreLogAndCreateErrorResult:
 # ---------------------------------------------------------------------------
 
 class TestExosuitCoreCompile:
-    def test_accepts_compiled_graph(self):
-        """ExosuitCore must accept a Liner instance with compiled graph."""
+    def test_accepts_precompiled_graph(self):
+        """ExosuitCore must accept a Liner instance with a pre-compiled graph."""
         # Create a StateGraph and compile it with a checkpointer
         graph = _simple_graph()
         checkpointer = MemorySaver()
         compiled = graph.compile(checkpointer=checkpointer)
 
-        # Should NOT be a StateGraph
-        from langgraph.graph.state import StateGraph
-        assert not isinstance(compiled, StateGraph)
+        # Compiled graph should not be a StateGraph
+        from langgraph.graph.state import StateGraph as LangGraphStateGraph
+        assert not isinstance(compiled, LangGraphStateGraph)
 
         class TestLiner(ExosuitLiner):
-            def get_compiled_graph(self) -> Any:
+            def get_graph(self) -> Any:
                 return compiled
 
             def get_checkpointer(self) -> Any:
-                return MemorySaver()
+                return checkpointer
 
         core = ExosuitCore(TestLiner())
         result = core.run({"value": "test"})
         assert result.final_result is not None
+        assert result.final_result == {"value": "test_done"}
 
-    def test_rejects_uncompiled_state_graph(self):
-        """ExosuitCore raises ValueError if get_compiled_graph returns a StateGraph."""
+    def test_accepts_uncompiled_state_graph(self):
+        """ExosuitCore accepts and compiles an uncompiled StateGraph from get_graph."""
         # Return an uncompiled StateGraph (not calling .compile())
         uncompiled = _simple_graph()
 
+        checkpointer = MemorySaver()
+
         class TestLiner(ExosuitLiner):
-            def get_compiled_graph(self) -> Any:
+            def get_graph(self) -> Any:
                 return uncompiled
 
             def get_checkpointer(self) -> Any:
-                return MemorySaver()
+                return checkpointer
 
-        with pytest.raises(ValueError, match="compiled graph.*StateGraph"):
-            ExosuitCore(TestLiner())
+        # Should not raise; ExosuitCore should compile it for us
+        core = ExosuitCore(TestLiner())
+        result = core.run({"value": "test"})
+        assert result.final_result is not None
+        assert result.final_result == {"value": "test_done"}
 
-    def test_rejects_uncompiled_state_graph_error_message(self):
-        """Error message guides users to call .compile()."""
+    def test_uncompiled_state_graph_compiles_with_correct_checkpointer(self):
+        """ExosuitCore compiles uncompiled StateGraph using the correct checkpointer."""
         uncompiled = _simple_graph()
+        checkpointer = MemorySaver()
 
         class TestLiner(ExosuitLiner):
-            def get_compiled_graph(self) -> Any:
+            def get_graph(self) -> Any:
                 return uncompiled
 
             def get_checkpointer(self) -> Any:
-                return MemorySaver()
+                return checkpointer
 
-        with pytest.raises(ValueError) as exc_info:
-            ExosuitCore(TestLiner())
-
-        error_msg = str(exc_info.value)
-        assert ".compile(" in error_msg
+        core = ExosuitCore(TestLiner())
+        # Run and pause to verify checkpointer is set up correctly
+        core_with_interrupt = _make_core(_interrupt_graph, precompile=False)
+        result = core_with_interrupt.run({"value": "start"}, thread_id="t1")
+        
+        # Should pause with a checkpoint
+        assert result.interrupt_value is not None
+        assert result.checkpoint_id is not None
 

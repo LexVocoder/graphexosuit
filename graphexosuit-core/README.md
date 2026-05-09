@@ -40,14 +40,15 @@ class State(TypedDict):
     value: str
 
 def approval_node(state):
+    APPROVE_PAYLOAD="approve"
     response = interrupt(StandardizedInterrupt(
         message="Approve this action?",
         options=[
-            InterruptOption(id="approve", label="Approve", payload=None),
-            InterruptOption(id="reject",  label="Reject",  payload=None),
+            InterruptOption(payload=, label="Approve", payload=APPROVE_PAYLOAD),
+            InterruptOption(payload="", label="Reject",  payload="n💧pe"),
         ]
     ))
-    if response.id == "approve":
+    if response == APPROVE_PAYLOAD:
         return {"value": "approved"}
     return {"value": "rejected"}
 
@@ -55,13 +56,13 @@ class MyWorkflow(ExosuitLiner):
     def __init__(self):
         self._checkpointer = MemorySaver()
 
-    def get_compiled_graph(self):
-        """Return a *compiled* StateGraph."""
+    def get_graph(self):
+        """Return a StateGraph or a compiled StateGraph."""
         builder = StateGraph(State)
         builder.add_node("approval", approval_node)
         builder.set_entry_point("approval")
         builder.set_finish_point("approval")
-        return builder.compile(checkpointer=self._checkpointer)
+        return builder
 
     def get_checkpointer(self):
         return self._checkpointer
@@ -90,14 +91,14 @@ print(result)
 
 | Type | Description |
 |------|-------------|
-| `ExosuitCore` | Main orchestrator: accepts compiled graph, drives execution |
+| `ExosuitCore` | Main orchestrator: accepts graph, drives execution |
 | `RunResult` | Outcome of any graph invocation |
 | `StandardizedInterrupt` | Value passed to `interrupt()` by graph nodes |
 | `InterruptOption` | A selectable choice within an interrupt |
 
 ## Graph developer contract
 
-* `get_compiled_graph()` must return a **compiled** `StateGraph`.
+* `get_graph()` must return a `StateGraph` or a compiled `StateGraph`.
 * `get_checkpointer()` must return a LangGraph checkpointer.
 * Interrupt with `interrupt(StandardizedInterrupt(...))`.
 
