@@ -1,16 +1,18 @@
 from abc import ABC, abstractmethod
 from graphexosuit.core.runtime import RunResult
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import StateGraph
-from typing import Any, Optional
+from langgraph.graph.state import CompiledStateGraph
+from typing import Any
 
 
 class ExosuitLiner(ABC):
     @abstractmethod
-    def get_graph(self) -> Any:
+    def get_graph(self) -> StateGraph | CompiledStateGraph:
         pass
 
     @abstractmethod
-    def get_checkpointer(self) -> Any:
+    def get_checkpointer(self) -> BaseCheckpointSaver:
         pass
 
     def on_retry(self, thread_id: str, checkpoint_id: str) -> None:

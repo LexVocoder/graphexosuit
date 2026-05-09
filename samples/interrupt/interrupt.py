@@ -58,7 +58,7 @@ class InterruptLiner(ExosuitLiner):
     def get_checkpointer(self) -> Any:
         return self._checkpointer
 
-    def get_graph(self) -> Any:
+    def get_graph(self) -> StateGraph:
         builder = StateGraph(SimpleState)
         builder.add_node("initialize", initialize)
         builder.add_node("node", node)
