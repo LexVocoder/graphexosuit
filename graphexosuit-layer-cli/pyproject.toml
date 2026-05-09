@@ -16,7 +16,7 @@ dev = [
 ]
 
 [project.scripts]
-graphexosuit = "graphexosuitcli.cli:main"
+graphexosuit = "graphexosuit.layer.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

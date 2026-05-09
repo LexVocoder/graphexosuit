@@ -1,20 +1,19 @@
-# graphexosuitcli
+# graphexosuit-layer-cli
 
-Typer CLI for [graphexosuit](../graphexosuit) — execute, pause, resume, and retry LangGraph workflows from the command line.
+Typer CLI for [graphexosuit-core](../graphexosuit-core) — execute, pause, resume, and retry LangGraph workflows from the command line.
 
 ## Installation
 
 ```bash
-pip install graphexosuitcli
+pip install graphexosuit-layer-cli
 ```
 
 ## Configuration
 
-<!-- TODO: change LANGGRAPH_GRAPH_MODULE instances to GRAPHEXOSUIT_LINER_CLASS and update surrounding text -->
-Set the `LANGGRAPH_GRAPH_MODULE` environment variable to the dotted path of the class having `get_compiled_graph()` and `get_checkpointer()` methods:
+Set the `GRAPHEXOSUIT_LINER_CLASS` environment variable to the module path and class name in the format `"module.path:ClassName"`:
 
 ```bash
-export LANGGRAPH_GRAPH_MODULE=my_project.workflows
+export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
 ```
 
 ## Commands
@@ -22,7 +21,7 @@ export LANGGRAPH_GRAPH_MODULE=my_project.workflows
 ### `graphexosuit run`
 
 ```bash
-graphexosuit run --input '{"value": "start"}' [--thread-id <id>]
+graphexosuit run --initial-state '{"value": "start"}' [--thread-id <id>]
 ```
 
 ### `graphexosuit resume`
@@ -31,8 +30,7 @@ graphexosuit run --input '{"value": "start"}' [--thread-id <id>]
 graphexosuit resume \
   --thread-id <id> \
   --checkpoint-id <id> \
-  --resume-id approve \
-  [--payload '{"key": "value"}']
+  --resume-value '{"key": "value"}'
 ```
 
 ### `graphexosuit retry`

@@ -10,7 +10,7 @@ from typing import Any, TypedDict
 from typer.testing import CliRunner
 
 from graphexosuit.core import ExosuitLiner
-from graphexosuitcli.cli import app
+from graphexosuit.layer.cli import app
 
 
 # ---------------------------------------------------------------------------

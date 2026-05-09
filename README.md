@@ -27,39 +27,39 @@ See [graphexosuit-core README](graphexosuit-core/README.md) for full documentati
 
 ---
 
-### 2. [`graphexosuitcli`](graphexosuitcli/) — CLI Tool
+### 2. [`graphexosuit-layer-cli`](graphexosuit-layer-cli/) — CLI Tool
 Typer CLI for executing graphexosuit workflows from the command line.
 
 **Install:**
 ```bash
-uv pip install ./graphexosuitcli
+uv pip install ./graphexosuit-layer-cli
 ```
 
 **Usage:**
 ```bash
-export LANGGRAPH_GRAPH_MODULE=my_project.workflows
-graphexosuit run --input '{"value": "start"}' --thread-id my-thread
+export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
+graphexosuit run --initial-state '{"value": "start"}' --thread-id my-thread
 ```
 
-See [graphexosuitcli README](graphexosuitcli/README.md) for full documentation.
+See [graphexosuit-layer-cli README](graphexosuit-layer-cli/README.md) for full documentation.
 
 ---
 
-### 3. [`graphexosuitweb`](graphexosuitweb/) — Web Service
+### 3. [`graphexosuit-layer-backend`](graphexosuit-layer-backend/) — Web Service
 FastAPI web service for executing graphexosuit workflows over HTTP.
 
 **Install:**
 ```bash
-uv pip install ./graphexosuitweb
+uv pip install ./graphexosuit-layer-backend
 ```
 
 **Usage:**
 ```bash
-export LANGGRAPH_GRAPH_MODULE=my_project.workflows
-uvicorn graphexosuitweb.app:app --host 0.0.0.0 --port 8000
+export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
+uvicorn graphexosuit.layer.backend:app --host 0.0.0.0 --port 8000
 ```
 
-See [graphexosuitweb README](graphexosuitweb/README.md) for full documentation.
+See [graphexosuit-layer-backend README](graphexosuit-layer-backend/README.md) for full documentation.
 
 ---
 
@@ -71,16 +71,16 @@ Each package is **independently installable**. Install only what you need:
 
 For local development with these packages in their directories:
 
-- **Core library only:** `uv pip install ./graphexosuit`
-- **Core + CLI:** `uv pip install ./graphexosuit ./graphexosuitcli`
-- **Core + Web:** `uv pip install ./graphexosuit ./graphexosuitweb`
-- **All three:** `uv pip install ./graphexosuit ./graphexosuitcli ./graphexosuitweb`
+- **Core library only:** `uv pip install ./graphexosuit-core`
+- **Core + CLI:** `uv pip install ./graphexosuit-core ./graphexosuit-layer-cli`
+- **Core + Web:** `uv pip install ./graphexosuit-core ./graphexosuit-layer-backend`
+- **All three:** `uv pip install ./graphexosuit-core ./graphexosuit-layer-cli ./graphexosuit-layer-backend`
 
 Or install core first, then add optional packages:
 ```bash
-uv pip install ./graphexosuit
-uv pip install ./graphexosuitcli
-uv pip install ./graphexosuitweb
+uv pip install ./graphexosuit-core
+uv pip install ./graphexosuit-layer-cli
+uv pip install ./graphexosuit-layer-backend
 ```
 
 ### From PyPI (when published)
@@ -88,9 +88,9 @@ uv pip install ./graphexosuitweb
 When packages are published to PyPI, standard dependency resolution applies:
 
 ```bash
-uv pip install graphexosuit
-uv pip install graphexosuitcli  # automatically installs graphexosuit
-uv pip install graphexosuitweb  # automatically installs graphexosuit
+uv pip install graphexosuit-core
+uv pip install graphexosuit-layer-cli  # automatically installs graphexosuit-core
+uv pip install graphexosuit-layer-backend  # automatically installs graphexosuit-core
 ```
 
 ## License
