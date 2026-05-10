@@ -6,10 +6,11 @@ import sys
 import traceback
 import uuid
 from dataclasses import dataclass, field
+from langchain_core.runnables.config import RunnableConfig
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import StateGraph
 from langgraph.types import Command
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 
 @dataclass
@@ -91,7 +92,7 @@ def _validate_interrupt_value(value: Any) -> None:
             )
 
 
-def _extract_checkpoint_id(graph: Any, config: dict) -> Optional[str]:
+def _extract_checkpoint_id(graph: Any, config: RunnableConfig) -> Optional[str]:
     """Return the latest checkpoint ID from the graph state."""
     state = graph.get_state(config)
     return state.config["configurable"].get("checkpoint_id")
@@ -183,10 +184,11 @@ class ExosuitCore:
 
     def _invoke(self,
                 initial_state: Any,
-                config: dict,
+                config: RunnableConfig,
                 ) -> RunResult:
         """Invoke the graph and return a RunResult, handling pauses and errors."""
-        thread_id: str = config["configurable"]["thread_id"]
+        # configurable key is guaranteed to exist; all config dicts are created with it by this class
+        thread_id: str = cast(dict, config)["configurable"]["thread_id"]
 
         try:
             output = self._graph_app.invoke(initial_state, config=config, durability='sync')
@@ -247,7 +249,7 @@ class ExosuitCore:
         """
         if thread_id is None:
             thread_id = str(uuid.uuid4())
-        config = {"configurable": {"thread_id": thread_id}}
+        config = cast(RunnableConfig, {"configurable": {"thread_id": thread_id}})
 
         if hasattr(self._liner, "transform_initial_state"):
             initial_state = self._liner.transform_initial_state(initial_state)
@@ -275,12 +277,12 @@ class ExosuitCore:
         if hasattr(self._liner, "transform_resume_value"):
             resume_value = self._liner.transform_resume_value(resume_value)
 
-        config = {
+        config = cast(RunnableConfig, {
             "configurable": {
                 "thread_id": thread_id,
                 "checkpoint_id": checkpoint_id,
             }
-        }
+        })
         return self._invoke(Command(resume=resume_value), config)
 
     def retry(self, thread_id: str, checkpoint_id: str) -> RunResult:
@@ -305,12 +307,12 @@ class ExosuitCore:
                     checkpoint_id=checkpoint_id,
                 )
 
-        config = {
+        config = cast(RunnableConfig, {
             "configurable": {
                 "thread_id": thread_id,
                 "checkpoint_id": checkpoint_id,
             }
-        }
+        })
 
         # None is a magic value meaning "resume from last checkpoint"
         return self._invoke(None, config)
