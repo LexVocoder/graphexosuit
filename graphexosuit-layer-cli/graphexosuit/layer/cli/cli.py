@@ -94,7 +94,7 @@ def _to_cli_args(run_result, liner_class, liner_dir):
 
 @app.command()
 def run(
-    initial_state_json: str = typer.Option(..., "--initial-state", help="Graph input as a JSON string."),
+    initial_state_json: str = typer.Option(..., "--initial-state", help="Graph input dict as a JSON string."),
     thread_id: Optional[str] = typer.Option(
         None, "--thread-id", help="Optional thread identifier."
     ),

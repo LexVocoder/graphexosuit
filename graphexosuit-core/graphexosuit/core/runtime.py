@@ -181,7 +181,10 @@ class ExosuitCore:
 
         return run_result
 
-    def _invoke(self, initial_state: Any, config: dict) -> RunResult:
+    def _invoke(self,
+                initial_state: Any,
+                config: dict,
+                ) -> RunResult:
         """Invoke the graph and return a RunResult, handling pauses and errors."""
         thread_id: str = config["configurable"]["thread_id"]
 
@@ -230,7 +233,7 @@ class ExosuitCore:
 
     def run(
         self,
-        initial_state: Any,
+        initial_state: dict,
         thread_id: Optional[str] = None,
     ) -> RunResult:
         """Execute the graph from the beginning.
@@ -238,7 +241,7 @@ class ExosuitCore:
         Parameters
         ----------
         initial_state:
-            Initial state passed to the graph, usually a dict.
+            Initial state passed to the graph.
         thread_id:
             Optional identifier.  A UUID is generated when omitted.
         """
