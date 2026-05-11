@@ -84,7 +84,7 @@ class _TestLiner(ExosuitLiner):
     def get_graph(self) -> Any:
         return _get_graph()
 
-    def get_checkpointer_cm(self) -> Any:
+    def get_checkpointer(self) -> Any:
         return _CheckpointerContextManager(_get_checkpointer())
 
 

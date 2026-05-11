@@ -78,9 +78,9 @@ class _TestLiner(ExosuitLiner):
     """Liner-compatible class for testing."""
 
     def get_graph(self) -> Any:
-        return _get_graph(self.get_checkpointer_cm().__enter__())
+        return _get_graph(self.get_checkpointer().__enter__())
 
-    def get_checkpointer_cm(self) -> Any:
+    def get_checkpointer(self) -> Any:
         return _CheckpointerContextManager(_get_checkpointer())
 
 

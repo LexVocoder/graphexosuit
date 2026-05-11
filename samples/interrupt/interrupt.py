@@ -46,7 +46,7 @@ class InterruptLiner(ExosuitLiner):
     def __init__(self):
         pass
 
-    def get_checkpointer_cm(self) -> Any:
+    def get_checkpointer(self) -> Any:
         # Cross-platform parent of the .cache directory
         cache_dir = os.path.join(
             os.getenv("LOCALAPPDATA", os.path.expanduser("~")),
