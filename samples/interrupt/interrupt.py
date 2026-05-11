@@ -70,6 +70,6 @@ class InterruptLiner(ExosuitLiner):
         return builder
 
 if __name__ == "__main__":
-    from graphexosuit.layer.cli import main
-    os.environ["GRAPHEXOSUIT_LINER_CLASS"] = f"interrupt:{InterruptLiner.__name__}"
-    main()
+    from graphexosuit.layer.cli import CliApp
+    cli = CliApp(InterruptLiner())
+    cli()

@@ -10,7 +10,7 @@ from typing import Any, TypedDict
 from typer.testing import CliRunner
 
 from graphexosuit.core import ExosuitLiner
-from graphexosuit.layer.cli import app
+from graphexosuit.layer.cli import CliApp
 
 
 # ---------------------------------------------------------------------------
@@ -106,8 +106,9 @@ def _parse_json(output: str) -> dict:
     return obj
 
 
-def _env():
-    return {"GRAPHEXOSUIT_LINER_CLASS": f"{_FAKE_MODULE}:_TestLiner"}
+def _get_cli():
+    """Create a CliApp instance with a test liner."""
+    return CliApp(_TestLiner())
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +117,9 @@ def _env():
 
 class TestRunCommand:
     def test_run_to_completion(self):
+        cli = _get_cli()
         result = runner.invoke(
-            app, ["run", "--initial-state", '{"value": "hello"}'], env=_env()
+            cli.app, ["run", "--initial-state", '{"value": "hello"}']
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
@@ -125,23 +127,19 @@ class TestRunCommand:
         assert data["final_result"]["value"] == "hello_done"
 
     def test_run_with_thread_id(self):
+        cli = _get_cli()
         result = runner.invoke(
-            app,
+            cli.app,
             ["run", "--initial-state", '{"value": "hello"}', "--thread-id", "my-thread"],
-            env=_env(),
         )
         assert result.exit_code == 0
         data = _parse_json(result.output)
         assert data["thread_id"] == "my-thread"
 
     def test_run_invalid_json(self):
-        result = runner.invoke(app, ["run", "--initial-state", "not-json"], env=_env())
+        cli = _get_cli()
+        result = runner.invoke(cli.app, ["run", "--initial-state", "not-json"])
         assert result.exit_code != 0
-
-    def test_run_missing_env_var(self):
-        result = runner.invoke(app, ["run", "--initial-state", '{"value": "x"}'])
-        # Should fail because GRAPHEXOSUIT_LINER_CLASS is not set
-        assert result.exit_code != 0 or "not set" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -151,10 +149,10 @@ class TestRunCommand:
 class TestResumeCommand:
     def _get_paused(self):
         """Run until pause, return thread_id and checkpoint_id."""
+        cli = _get_cli()
         result = runner.invoke(
-            app,
+            cli.app,
             ["run", "--initial-state", '{"value": "interrupt_me"}', "--thread-id", "t-res"],
-            env=_env(),
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
@@ -162,16 +160,16 @@ class TestResumeCommand:
         return data["thread_id"], data["checkpoint_id"]
 
     def test_resume_completes(self):
+        cli = _get_cli()
         thread_id, checkpoint_id = self._get_paused()
         result = runner.invoke(
-            app,
+            cli.app,
             [
                 "resume",
                 "--thread-id", thread_id,
                 "--checkpoint-id", checkpoint_id,
                 "--resume-value", "{}",
             ],
-            env=_env(),
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
@@ -179,31 +177,31 @@ class TestResumeCommand:
         assert data["thread_id"] == thread_id
 
     def test_resume_with_payload(self):
+        cli = _get_cli()
         thread_id, checkpoint_id = self._get_paused()
         result = runner.invoke(
-            app,
+            cli.app,
             [
                 "resume",
                 "--thread-id", thread_id,
                 "--checkpoint-id", checkpoint_id,
                 "--resume-value", '{"extra": "data"}',
             ],
-            env=_env(),
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
         assert data["final_result"] is not None
 
     def test_resume_invalid_payload_json(self):
+        cli = _get_cli()
         result = runner.invoke(
-            app,
+            cli.app,
             [
                 "resume",
                 "--thread-id", "t",
                 "--checkpoint-id", "c",
                 "--resume-value", "bad-json",
             ],
-            env=_env(),
         )
         assert result.exit_code != 0
 
@@ -214,24 +212,23 @@ class TestResumeCommand:
 
 class TestRetryCommand:
     def test_retry_recovers(self):
+        cli = _get_cli()
         # First run fails
         result = runner.invoke(
-            app,
+            cli.app,
             ["run", "--initial-state", '{"value": "fail_me"}', "--thread-id", "t-retry"],
-            env=_env(),
         )
         assert result.exit_code == 0, result.output
         data = _parse_json(result.output)
         assert data["error_message"] is not None
 
         result2 = runner.invoke(
-            app,
+            cli.app,
             [
                 "retry",
                 "--thread-id", data["thread_id"],
                 "--checkpoint-id", data["checkpoint_id"],
             ],
-            env=_env(),
         )
         assert result2.exit_code == 0, result2.output
         data2 = _parse_json(result2.output)
