@@ -45,26 +45,6 @@ See [graphexosuit-layer-cli README](graphexosuit-layer-cli/README.md) for full d
 
 ---
 
-### 3. [`graphexosuit-layer-backend`](graphexosuit-layer-backend/) — Web Service
-FastAPI web service for executing graphexosuit workflows over HTTP.
-
-**Install:**
-```bash
-uv pip install ./graphexosuit-layer-backend
-```
-
-**Usage:**
-```bash
-export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
-graphexosuitweb
-# or alternatively:
-uvicorn graphexosuit.layer.backend.app:app --host 0.0.0.0 --port 8000
-```
-
-See [graphexosuit-layer-backend README](graphexosuit-layer-backend/README.md) for full documentation.
-
----
-
 ## Installation
 
 Each package is **independently installable**. Install only what you need:
@@ -75,14 +55,11 @@ For local development with these packages in their directories:
 
 - **Core library only:** `uv pip install ./graphexosuit-core`
 - **Core + CLI:** `uv pip install ./graphexosuit-core ./graphexosuit-layer-cli`
-- **Core + Web:** `uv pip install ./graphexosuit-core ./graphexosuit-layer-backend`
-- **All three:** `uv pip install ./graphexosuit-core ./graphexosuit-layer-cli ./graphexosuit-layer-backend`
 
 Or install core first, then add optional packages:
 ```bash
 uv pip install ./graphexosuit-core
 uv pip install ./graphexosuit-layer-cli
-uv pip install ./graphexosuit-layer-backend
 ```
 
 ### From PyPI (when published)
@@ -92,7 +69,6 @@ When packages are published to PyPI, standard dependency resolution applies:
 ```bash
 uv pip install graphexosuit-core
 uv pip install graphexosuit-layer-cli  # automatically installs graphexosuit-core
-uv pip install graphexosuit-layer-backend  # automatically installs graphexosuit-core
 ```
 
 ## License
