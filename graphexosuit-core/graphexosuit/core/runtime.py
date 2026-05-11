@@ -102,20 +102,20 @@ class ExosuitCore:
     """Thin runtime wrapper around a LangGraph workflow.
 
     The constructor accepts a Liner-compatible instance that exposes
-    ``get_graph()`` and ``get_checkpointer()`` methods.
+    ``get_graph()`` and ``get_checkpointer_cm()`` methods.
 
     Parameters
     ----------
     liner:
         A Liner-compatible instance that provides ``get_graph()`` and
-        ``get_checkpointer()`` methods.
+        ``get_checkpointer_cm()`` methods.
     """
     def __init__(self, liner: Any) -> None:
         self._liner = liner
         graph = liner.get_graph()
         
         # Enter the checkpointer context manager and store it for cleanup in __del__
-        self._checkpointer_cm = liner.get_checkpointer()
+        self._checkpointer_cm = liner.get_checkpointer_cm()
         checkpointer = self._checkpointer_cm.__enter__()
 
         if isinstance(graph, StateGraph):

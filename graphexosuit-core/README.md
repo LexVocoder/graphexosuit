@@ -64,7 +64,7 @@ class MyWorkflow(ExosuitLiner):
         builder.set_finish_point("approval")
         return builder
 
-    def get_checkpointer(self):
+    def get_checkpointer_cm(self):
         return SqliteSaver.from_conn_string(...)
 ```
 
@@ -99,7 +99,7 @@ print(result)
 ## Graph developer contract
 
 * `get_graph()` must return a `StateGraph` or a compiled `StateGraph`.
-* `get_checkpointer()` must return either a LangGraph checkpointer or a context manager that yields one.
+* `get_checkpointer_cm()` must return a context manager that yields a LangGraph checkpointer ("Saver").
 * Interrupt with `interrupt(StandardizedInterrupt(...))`.
 
 ## Environment variable

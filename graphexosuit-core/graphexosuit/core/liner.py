@@ -12,7 +12,7 @@ class ExosuitLiner(ABC):
         pass
 
     @abstractmethod
-    def get_checkpointer(self) -> Iterator[BaseCheckpointSaver]:
+    def get_checkpointer_cm(self) -> Iterator[BaseCheckpointSaver]:
         pass
 
     def on_retry(self, thread_id: str, checkpoint_id: str) -> None:

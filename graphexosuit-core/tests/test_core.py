@@ -131,7 +131,7 @@ def _make_core(uncompiled_graph_thunk, precompile=True) -> ExosuitCore:
                 # Return raw StateGraph (ExosuitCore will compile it)
                 return graph
 
-        def get_checkpointer(self) -> Any:
+        def get_checkpointer_cm(self) -> Any:
             return _CheckpointerContextManager(checkpointer)
 
     return ExosuitCore(TestLiner())
@@ -607,7 +607,7 @@ class TestExosuitCoreCompile:
             def get_graph(self) -> Any:
                 return compiled
 
-            def get_checkpointer(self) -> Any:
+            def get_checkpointer_cm(self) -> Any:
                 return _CheckpointerContextManager(checkpointer)
 
         core = ExosuitCore(TestLiner())
@@ -626,7 +626,7 @@ class TestExosuitCoreCompile:
             def get_graph(self) -> Any:
                 return uncompiled
 
-            def get_checkpointer(self) -> Any:
+            def get_checkpointer_cm(self) -> Any:
                 return _CheckpointerContextManager(checkpointer)
 
         # Should not raise; ExosuitCore should compile it for us
@@ -644,7 +644,7 @@ class TestExosuitCoreCompile:
             def get_graph(self) -> Any:
                 return uncompiled
 
-            def get_checkpointer(self) -> Any:
+            def get_checkpointer_cm(self) -> Any:
                 return _CheckpointerContextManager(checkpointer)
 
         core = ExosuitCore(TestLiner())
