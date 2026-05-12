@@ -35,12 +35,6 @@ Typer CLI for executing graphexosuit workflows from the command line.
 uv pip install ./graphexosuit-layer-cli
 ```
 
-**Usage:**
-```bash
-export GRAPHEXOSUIT_LINER_CLASS=my_project.workflows:MyLiner
-graphexosuit run --initial-state '{"value": "start"}' --thread-id my-thread
-```
-
 See [graphexosuit-layer-cli README](graphexosuit-layer-cli/README.md) for full documentation.
 
 ---

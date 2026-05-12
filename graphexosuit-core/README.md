@@ -101,9 +101,3 @@ print(result)
 * `get_graph()` must return a `StateGraph` or a compiled `StateGraph`.
 * `get_checkpointer_cm()` must return a context manager that yields a LangGraph checkpointer ("Saver").
 * Interrupt with `interrupt(StandardizedInterrupt(...))`.
-
-## Environment variable
-
-| Variable | Description |
-|----------|-------------|
-| `GRAPHEXOSUIT_LINER_CLASS` | Module and class path (e.g. `my_project.workflows:MyWorkflow`) used by CLI/web packages |
