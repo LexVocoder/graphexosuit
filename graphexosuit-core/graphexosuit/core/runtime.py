@@ -41,12 +41,11 @@ class StandardizedInterrupt:
 class RunResult:
     """The outcome of a graph execution, pause, or error.
 
-    Exactly one of error_message, interrupt_value, or final_result is non-None.
+    Exactly one of interrupt_value or final_result is non-None.
     """
 
     thread_id: str
     checkpoint_id: Optional[str] = None
-    error_message: Optional[str] = None
     interrupt_value: Optional[StandardizedInterrupt] = None
     final_result: Optional[dict] = None
 
@@ -57,27 +56,21 @@ class RunResult:
 def _validate_run_result(result: RunResult) -> None:
     """Raise ValueError if RunResult is in an inconsistent state.
 
-    Exactly one of error_message, interrupt_value, or final_result must be non-None.
-    If interrupt_value or error_message is set, checkpoint_id must also be set.
+    Exactly one of interrupt_value or final_result must be non-None.
+    If interrupt_value is set, checkpoint_id must also be set.
     """
     has_completion = result.final_result is not None
-    has_error = result.error_message is not None
     has_interrupt = result.interrupt_value is not None
 
-    terminal_states = sum([has_completion, has_error, has_interrupt])
+    terminal_states = sum([has_completion, has_interrupt])
     if terminal_states != 1:
         raise ValueError(
-            "RunResult: exactly one of final_result, error_message, or interrupt_value must be set"
+            "RunResult: exactly one of final_result or interrupt_value must be set"
         )
 
     if has_interrupt and result.checkpoint_id is None:
         raise ValueError(
             "RunResult: interrupt_value set requires checkpoint_id to be set"
-        )
-
-    if has_error and result.checkpoint_id is None:
-        raise ValueError(
-            "RunResult: error_message set requires checkpoint_id to be set"
         )
 
 
@@ -147,7 +140,6 @@ class ExosuitCore:
             self,
             thread_id: str,
             checkpoint_id: Optional[str] = None,
-            error_message: Optional[str] = None,
             interrupt_value: Optional[StandardizedInterrupt] = None,
             final_result: Optional[dict] = None,
     ) -> RunResult:
@@ -155,7 +147,6 @@ class ExosuitCore:
         run_result = RunResult(
             thread_id=thread_id,
             checkpoint_id=checkpoint_id,
-            error_message=error_message,
             interrupt_value=interrupt_value,
             final_result=final_result,
         )

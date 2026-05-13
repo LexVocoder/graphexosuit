@@ -148,10 +148,6 @@ class TestRunResultValidation:
         r = RunResult(thread_id="t1", final_result={"x": 1})
         assert r.final_result is not None
 
-    def test_completion_result_with_error_raises(self):
-        with pytest.raises(ValueError, match="exactly one"):
-            RunResult(thread_id="t1", error_message="oops", final_result={"x": 1})
-
     def test_completion_result_with_interrupt_raises(self):
         iv = StandardizedInterrupt(message="m", options=[])
         with pytest.raises(ValueError, match="exactly one"):
@@ -175,14 +171,6 @@ class TestRunResultValidation:
         iv = StandardizedInterrupt(message="m", options=[])
         with pytest.raises(ValueError, match="checkpoint_id"):
             RunResult(thread_id="t1", interrupt_value=iv)
-
-    def test_error_valid(self):
-        r = RunResult(thread_id="t1", error_message="boom", checkpoint_id="cid")
-        assert r.error_message == "boom"
-
-    def test_error_missing_checkpoint_id_raises(self):
-        with pytest.raises(ValueError, match="checkpoint_id"):
-            RunResult(thread_id="t1", error_message="boom")
 
     def test_no_terminal_state_raises(self):
         with pytest.raises(ValueError, match="exactly one"):
@@ -231,7 +219,6 @@ class TestExosuitCoreRun:
         core = _make_core(_simple_graph)
         result = core.run({"value": "hello"})
         assert result.final_result is not None
-        assert result.error_message is None
         assert result.interrupt_value is None
         assert result.final_result == {"value": "hello_done"}
 
@@ -250,7 +237,6 @@ class TestExosuitCoreRun:
         result = core.run({"value": "start"})
         assert result.final_result is None
         assert result.interrupt_value is not None
-        assert result.error_message is None
         assert result.interrupt_value.message == "Approve?"
         assert result.checkpoint_id is not None
 
@@ -541,7 +527,6 @@ class TestExosuitCoreBuildRunResult:
 
         # Result should pass through without modification
         assert result.final_result == {"value": "test"}
-        assert result.error_message is None
 
 
 # ---------------------------------------------------------------------------
