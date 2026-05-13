@@ -11,7 +11,7 @@ from dataclasses import asdict
 from shlex import quote
 from typing import Any, Optional
 
-from graphexosuit.core import ExosuitCore, ExosuitLiner, RunResult
+from graphexosuit.core import ExosuitCore, ExosuitLiner, RunResult, GraphExecutionError
 
 
 def _get_quoted_program_name() -> str:
@@ -95,7 +95,16 @@ class CliApp:
             typer.echo(f"Invalid JSON for --initial-state: {exc}", err=True)
             raise typer.Exit(code=1)
 
-        result = self.core.run(initial_state, thread_id=thread_id)
+        try:
+            result = self.core.run(initial_state, thread_id=thread_id)
+        except GraphExecutionError as exc:
+            # Convert GraphExecutionError to RunResult for consistent CLI output
+            result = RunResult(
+                thread_id=exc.get_thread_id(),
+                checkpoint_id=exc.get_checkpoint_id(),
+                error_message=str(exc.get_original_exception()),
+            )
+        
         _print_result(result)
         _print_tips_to_stderr(result)
 
@@ -113,7 +122,16 @@ class CliApp:
             typer.echo(f"Invalid JSON for --resume-value: {exc}", err=True)
             raise typer.Exit(code=1)
 
-        result = self.core.resume(thread_id, checkpoint_id, resume_value)
+        try:
+            result = self.core.resume(thread_id, checkpoint_id, resume_value)
+        except GraphExecutionError as exc:
+            # Convert GraphExecutionError to RunResult for consistent CLI output
+            result = RunResult(
+                thread_id=exc.get_thread_id(),
+                checkpoint_id=exc.get_checkpoint_id(),
+                error_message=str(exc.get_original_exception()),
+            )
+        
         _print_result(result)
         _print_tips_to_stderr(result)
 
@@ -123,7 +141,16 @@ class CliApp:
         checkpoint_id: str = typer.Option(..., "--checkpoint-id", help="Checkpoint identifier."),
     ) -> None:
         """Retry the failed node of a graph execution."""
-        result = self.core.retry(thread_id, checkpoint_id)
+        try:
+            result = self.core.retry(thread_id, checkpoint_id)
+        except GraphExecutionError as exc:
+            # Convert GraphExecutionError to RunResult for consistent CLI output
+            result = RunResult(
+                thread_id=exc.get_thread_id(),
+                checkpoint_id=exc.get_checkpoint_id(),
+                error_message=str(exc.get_original_exception()),
+            )
+        
         _print_result(result)
         _print_tips_to_stderr(result)
 

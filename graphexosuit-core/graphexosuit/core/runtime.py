@@ -12,6 +12,8 @@ from langgraph.graph import StateGraph
 from langgraph.types import Command
 from typing import Any, Optional, cast
 
+from graphexosuit.core.errors import GraphExecutionError, InvalidInterruptError
+
 
 @dataclass
 class InterruptOption:
@@ -80,22 +82,22 @@ def _validate_run_result(result: RunResult) -> None:
 
 
 def _validate_interrupt_value(value: Any) -> None:
-    """Raise ValueError if *value* does not satisfy the StandardizedInterrupt duck type."""
+    """Raise InvalidInterruptError if *value* does not satisfy the StandardizedInterrupt duck type."""
     if not (hasattr(value, "message") and hasattr(value, "options")):
-        raise ValueError(
+        raise InvalidInterruptError(
             "Interrupt must have 'message' and 'options' attributes"
         )
     for option in value.options:
         if not (hasattr(option, "label") and hasattr(option, "payload")):
-            raise ValueError(
+            raise InvalidInterruptError(
                 "Each interrupt option must have 'label' and 'payload' attributes"
             )
 
 
-def _extract_checkpoint_id(graph: Any, config: RunnableConfig) -> Optional[str]:
-    """Return the latest checkpoint ID from the graph state."""
+def _extract_checkpoint_id(graph: Any, config: RunnableConfig) -> str:
+    """Return the latest checkpoint ID from the graph state, or 'unknown' if not available."""
     state = graph.get_state(config)
-    return state.config["configurable"].get("checkpoint_id")
+    return state.config["configurable"].get("checkpoint_id", "unknown")
 
 
 class ExosuitCore:
@@ -164,24 +166,6 @@ class ExosuitCore:
         _validate_run_result(run_result)
         return run_result
 
-    def _log_and_create_error_result(
-            self,
-            exc: Exception,
-            thread_id: str,
-            checkpoint_id: str,
-            error_prefix: Optional[str] = None,
-    ) -> RunResult:
-
-        traceback.print_exception(exc, file=sys.stderr)
-
-        run_result = self._build_run_result(
-                thread_id=thread_id,
-                checkpoint_id=checkpoint_id,
-                error_message=f"{error_prefix}: {exc}" if error_prefix else str(exc),
-            )
-
-        return run_result
-
     def _invoke(self,
                 initial_state: Any,
                 config: RunnableConfig,
@@ -195,29 +179,29 @@ class ExosuitCore:
         except Exception as exc:
             # An error occurred during graph execution. It could be anything.
             checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
-            return self._log_and_create_error_result(
-                exc=exc,
+            raise GraphExecutionError(
+                message="Graph execution failed",
+                original_exception=exc,
                 thread_id=thread_id,
-                error_prefix="Error during graph execution",
-                checkpoint_id=checkpoint_id if checkpoint_id else "unknown",
-            )
+                checkpoint_id=checkpoint_id,
+            ) from exc
 
         # LangGraph signals an interrupt by including __interrupt__ in the output
         interrupts = output.get("__interrupt__", []) if isinstance(output, dict) else []
         if interrupts:
             interrupt_obj = interrupts[0].value
+            checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
+
             try:
                 _validate_interrupt_value(interrupt_obj)
-            except ValueError as exc:
-                checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
-                return self._log_and_create_error_result(
-                    exc=exc,
+            except InvalidInterruptError as exc:
+                raise GraphExecutionError(
+                    message="Graph returned an invalid interrupt value",
+                    original_exception=exc,
                     thread_id=thread_id,
-                    error_prefix=f"Graph returned an invalid interrupt value",
-                    checkpoint_id=checkpoint_id if checkpoint_id else "unknown",
-                )
+                    checkpoint_id=checkpoint_id,
+                ) from exc
 
-            checkpoint_id = _extract_checkpoint_id(self._graph_app, config)
             return self._build_run_result(
                 thread_id=thread_id,
                 interrupt_value=interrupt_obj,
@@ -300,12 +284,12 @@ class ExosuitCore:
             try:
                 self._liner.on_retry(thread_id=thread_id, checkpoint_id=checkpoint_id)
             except Exception as exc:
-                return self._log_and_create_error_result(
-                    exc=exc,
+                raise GraphExecutionError(
+                    message="Error in liner's on_retry hook",
+                    original_exception=exc,
                     thread_id=thread_id,
-                    error_prefix="Error in liner's on_retry hook",
                     checkpoint_id=checkpoint_id,
-                )
+                ) from exc
 
         config = cast(RunnableConfig, {
             "configurable": {

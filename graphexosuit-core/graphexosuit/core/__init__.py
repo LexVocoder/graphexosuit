@@ -12,6 +12,7 @@ from graphexosuit.core.runtime import (
 from graphexosuit.core.errors import (
     GraphLoaderError,
     InvalidInterruptError,
+    GraphExecutionError,
 )
 from graphexosuit.core.liner import ExosuitLiner
 
@@ -23,6 +24,7 @@ __all__ = [
     "ExosuitLiner",
     "GraphLoaderError",
     "InvalidInterruptError",
+    "GraphExecutionError",
     "_validate_run_result",
     "_validate_interrupt_value",
     "_extract_checkpoint_id",

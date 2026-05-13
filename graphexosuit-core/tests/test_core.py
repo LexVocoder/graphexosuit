@@ -18,6 +18,8 @@ from graphexosuit.core import (
     ExosuitLiner,
     _validate_run_result,
     _validate_interrupt_value,
+    InvalidInterruptError,
+    GraphExecutionError,
 )
 
 
@@ -201,12 +203,12 @@ class TestValidationHelpers:
 
     def test_interrupt_missing_message(self):
         obj = MagicMock(spec=["options"])
-        with pytest.raises(ValueError, match="message"):
+        with pytest.raises(InvalidInterruptError, match="message"):
             _validate_interrupt_value(obj)
 
     def test_interrupt_missing_options(self):
         obj = MagicMock(spec=["message"])
-        with pytest.raises(ValueError, match="message"):
+        with pytest.raises(InvalidInterruptError, match="message"):
             _validate_interrupt_value(obj)
 
     def test_interrupt_option_missing_payload(self):
@@ -214,7 +216,7 @@ class TestValidationHelpers:
         iv = MagicMock()
         iv.message = "m"
         iv.options = [bad_option]
-        with pytest.raises(ValueError, match="'label' and 'payload'"):
+        with pytest.raises(InvalidInterruptError, match="'label' and 'payload'"):
             _validate_interrupt_value(iv)
 
 
@@ -252,21 +254,29 @@ class TestExosuitCoreRun:
         assert result.interrupt_value.message == "Approve?"
         assert result.checkpoint_id is not None
 
-    def test_run_error_returns_error_result(self):
+    def test_run_error_raises_graph_execution_error(self):
         core = _make_core(_error_graph)
-        result = core.run({"value": "start"})
-        assert result.final_result is None
-        assert result.interrupt_value is None
-        assert result.error_message is not None and "first attempt failed" in result.error_message
+        with pytest.raises(GraphExecutionError) as exc_info:
+            core.run({"value": "start"})
+        
+        error = exc_info.value
+        assert "Graph execution failed" in str(error)
+        assert error.get_original_exception() is not None
+        assert isinstance(error.get_original_exception(), RuntimeError)
+        assert "first attempt failed" in str(error.get_original_exception())
+        assert error.get_thread_id() is not None
 
-    def test_run_invalid_interrupt_returns_error_result(self):
+    def test_run_invalid_interrupt_raises_graph_execution_error(self):
         core = _make_core(_invalid_interrupt_graph)
-        result = core.run({"value": "start"})
-        assert result.final_result is None
-        assert result.interrupt_value is None
-        assert result.error_message is not None
-        # Error can be due to serialization or validation
-        assert result.error_message != ""
+        # Invalid interrupt causes serialization error during checkpoint save,
+        # which is then wrapped in GraphExecutionError
+        with pytest.raises(GraphExecutionError) as exc_info:
+            core.run({"value": "start"})
+        
+        error = exc_info.value
+        assert error.get_thread_id() is not None
+        # The original error is a serialization error from msgpack
+        assert "Type is not msgpack serializable" in str(error.get_original_exception())
 
     def test_run_without_transform_initial_state_passes_unchanged(self):
         """When liner has no transform_initial_state, initial_state is passed to _invoke unchanged."""
@@ -409,11 +419,15 @@ class TestExosuitCoreRetry:
     def test_retry_recovers(self):
         core = _make_core(_error_graph)
         # First call: error
-        err_result = core.run({"value": "start"}, thread_id="t-retry")
-        assert err_result.error_message
-        assert err_result.checkpoint_id is not None
-        # Retry
-        result = core.retry(err_result.thread_id, err_result.checkpoint_id)
+        with pytest.raises(GraphExecutionError) as exc_info:
+            core.run({"value": "start"}, thread_id="t-retry")
+        
+        # Extract checkpoint from the exception for retry
+        err = exc_info.value
+        checkpoint_id = err.get_checkpoint_id()
+
+        # Retry with the checkpoint from the error
+        result = core.retry(err.get_thread_id(), checkpoint_id)
         assert result.final_result is not None
         assert result.final_result == {"value": "recovered"}
 
@@ -432,17 +446,19 @@ class TestExosuitCoreRetry:
         core._liner.on_retry = on_retry_fn
         
         # First call: error
-        err_result = core.run({"value": "start"}, thread_id="t-hook")
-        assert err_result.error_message
-        assert err_result.checkpoint_id is not None
+        with pytest.raises(GraphExecutionError) as exc_info:
+            core.run({"value": "start"}, thread_id="t-hook")
+        
+        err = exc_info.value
+        checkpoint_id = err.get_checkpoint_id()
         
         # Retry
-        result = core.retry(err_result.thread_id, err_result.checkpoint_id)
+        result = core.retry(err.get_thread_id(), checkpoint_id)
         
         # Verify on_retry was called
         assert on_retry_called["called"]
-        assert on_retry_called["thread_id"] == err_result.thread_id
-        assert on_retry_called["checkpoint_id"] == err_result.checkpoint_id
+        assert on_retry_called["thread_id"] == err.get_thread_id()
+        assert on_retry_called["checkpoint_id"] == checkpoint_id
 
     def test_retry_on_retry_hook_throws_logs_stderr(self, capsys):
         """When on_retry hook throws, stderr is logged and error RunResult is returned."""
@@ -455,12 +471,14 @@ class TestExosuitCoreRetry:
         core._liner.on_retry = bad_on_retry_fn
         
         # First call: error
-        err_result = core.run({"value": "start"}, thread_id="t-hook-error")
-        assert err_result.error_message
-        assert err_result.checkpoint_id is not None
+        with pytest.raises(GraphExecutionError) as exc_info:
+            core.run({"value": "start"}, thread_id="t-hook-error")
         
-        # Retry
-        result = core.retry(err_result.thread_id, err_result.checkpoint_id)
+        err = exc_info.value
+        checkpoint_id = err.get_checkpoint_id()
+        
+        # Retry - should return error RunResult because on_retry hook threw
+        result = core.retry(err.get_thread_id(), checkpoint_id)
         
         # Verify stderr was logged
         captured = capsys.readouterr()
@@ -472,23 +490,21 @@ class TestExosuitCoreRetry:
         assert result.error_message  # truthy
         assert "on_retry" in result.error_message
 
-    def test_retry_get_state_raises_logs_stderr(self, capsys):
-        """When retry's _invoke raises an exception during execution, stderr is logged and error returned."""
+    def test_retry_graph_executes_again_and_recovers(self):
+        """When retry is called, graph executes again and can recover from errors."""
         core = _make_core(_error_graph)
         
-        # First call: error result
-        err_result = core.run({"value": "start"}, thread_id="t-get-state-error")
-        assert err_result.error_message
-        assert err_result.checkpoint_id is not None
+        # First call: error
+        with pytest.raises(GraphExecutionError) as exc_info:
+            core.run({"value": "start"}, thread_id="t-get-state-error")
         
-        # On second retry attempt, the error graph will error again on first execution
-        result = core.retry(err_result.thread_id, err_result.checkpoint_id)
+        err = exc_info.value
+        checkpoint_id = err.get_checkpoint_id()
         
-        # The error should still propagate (but on second attempt, recovery works)
-        # For this test, just verify that retry was attempted and we get a result
-        # (The error graph fails on first attempt, succeeds on second)
-        captured = capsys.readouterr()
-        # Since this is the second call, the error_graph should recover
+        # On retry, the error graph will succeed on second execution (call_count is now 2)
+        result = core.retry(err.get_thread_id(), checkpoint_id)
+        
+        # Verify the graph recovered
         assert result.final_result is not None
         assert result.final_result == {"value": "recovered"}
 
