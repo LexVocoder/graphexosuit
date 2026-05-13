@@ -9,7 +9,7 @@ from typing import Any, TypedDict
 
 from typer.testing import CliRunner
 
-from graphexosuit.core import ExosuitLiner
+from graphexosuit.core import ExosuitLiner, GraphExecutionError
 from graphexosuit.layer.cli import CliApp
 
 
@@ -218,16 +218,20 @@ class TestRetryCommand:
             cli.app,
             ["run", "--initial-state", '{"value": "fail_me"}', "--thread-id", "t-retry"],
         )
-        assert result.exit_code == 0, result.output
-        data = _parse_json(result.output)
-        assert data["error_message"] is not None
+        # When the graph execution fails, the CLI exits with error code
+        assert result.exit_code != 0
+        # Extract thread_id and checkpoint_id from the exception
+        assert result.exception is not None
+        assert isinstance(result.exception, GraphExecutionError)
+        thread_id = result.exception.get_thread_id()
+        checkpoint_id = result.exception.get_checkpoint_id()
 
         result2 = runner.invoke(
             cli.app,
             [
                 "retry",
-                "--thread-id", data["thread_id"],
-                "--checkpoint-id", data["checkpoint_id"],
+                "--thread-id", thread_id,
+                "--checkpoint-id", checkpoint_id,
             ],
         )
         assert result2.exit_code == 0, result2.output

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import json
 import sys
-import traceback
 import typer
 from dataclasses import asdict
 from shlex import quote
@@ -15,15 +14,31 @@ from typing import Any, Optional
 from graphexosuit.core import ExosuitCore, ExosuitLiner, RunResult, GraphExecutionError
 
 
+def print_retry_tip_to_stderr(exc: GraphExecutionError) -> None:
+    """Print a retry tip to stderr based on useful values in GraphExecutionError."""
+
+    tip = "Graph execution failed. To retry, run:\n"
+    tip += "\n"
+    tip += f"    {_get_quoted_program_name()} retry "
+    tip += _to_cli_args(exc.get_thread_id(), exc.get_checkpoint_id())
+
+    print(tip, file=sys.stderr)
+
+
 def _get_quoted_program_name() -> str:
     return quote(sys.argv[0] if len(sys.argv) > 0 else "graphexosuit")
 
 
-def _to_cli_args(run_result: RunResult) -> str:
-    """Build CLI arguments needed to reconstruct a run context."""
-    args = f"--thread-id {quote(run_result.thread_id)} "
-    if run_result.checkpoint_id:
-        args += f"--checkpoint-id {quote(run_result.checkpoint_id)} "
+def _to_cli_args(thread_id: str, checkpoint_id: Optional[str]) -> str:
+    """Build CLI arguments needed to reconstruct a run context.
+
+    Args:
+        thread_id: The thread identifier to include as `--thread-id`.
+        checkpoint_id: Optional checkpoint identifier to include as `--checkpoint-id`.
+    """
+    args = f"--thread-id {quote(thread_id)} "
+    if checkpoint_id:
+        args += f"--checkpoint-id {quote(checkpoint_id)} "
     return args
 
 
@@ -31,35 +46,25 @@ def _print_result(result) -> None:
     """Serialize a RunResult to JSON and print it to stdout."""
     print(json.dumps(asdict(result), default=str, indent=2))
 
+
 def _print_tips_to_stderr(run_result: RunResult) -> None:
     """Print re-execution tips to stderr if the graph execution did not complete."""
-    if run_result.final_result is not None:
+    if run_result.interrupt_value is None:
         return
 
-    tip = ""
-    if run_result.interrupt_value is not None:
-        tip += f"Graph execution paused; message = {repr(run_result.interrupt_value.message)}\n"
+    tip = f"Graph execution paused; message = {repr(run_result.interrupt_value.message)}\n"
 
-        for option in run_result.interrupt_value.options:
-            tip += "\n"
-            tip += f"- For {repr(option.label)}, run:  "
-            tip += f"{_get_quoted_program_name()} resume "
-            tip += _to_cli_args(run_result)
-
-            # Resumption requires the option's payload
-            tip += f"--resume-value {quote(json.dumps(option.payload))}"
-
-    elif run_result.error_message:
-        tip += "Graph execution failed. To retry, run:\n"
+    for option in run_result.interrupt_value.options:
         tip += "\n"
-        tip += f"    {_get_quoted_program_name()} retry "
+        tip += f"- For {repr(option.label)}, run:  "
+        tip += f"{_get_quoted_program_name()} resume "
+        tip += _to_cli_args(run_result.thread_id, run_result.checkpoint_id)
 
-        tip += _to_cli_args(run_result)
+        # Resumption requires the option's payload
+        tip += f"--resume-value {quote(json.dumps(option.payload))}"
 
-    # else we got no tips
+    print(tip, file=sys.stderr)
 
-    if tip:
-        print(tip, file=sys.stderr)  # adds a newline at the end
 
 class CliApp:
     """CLI application for graphexosuit; clients must inject a Liner instance."""
@@ -96,13 +101,8 @@ class CliApp:
             typer.echo(f"Invalid JSON for --initial-state: {exc}", err=True)
             raise typer.Exit(code=1)
 
-        try:
-            result = self.core.run(initial_state, thread_id=thread_id)
-        except GraphExecutionError as exc:
-            # Convert GraphExecutionError to RunResult for consistent CLI output
-            result = self._GraphExecutionError_to_RunResult(exc)
-            traceback.print_exc()
-        
+        result = self.core.run(initial_state, thread_id=thread_id)
+
         _print_result(result)
         _print_tips_to_stderr(result)
 
@@ -120,12 +120,7 @@ class CliApp:
             typer.echo(f"Invalid JSON for --resume-value: {exc}", err=True)
             raise typer.Exit(code=1)
 
-        try:
-            result = self.core.resume(thread_id, checkpoint_id, resume_value)
-        except GraphExecutionError as exc:
-            # Convert GraphExecutionError to RunResult for consistent CLI output
-            result = self._GraphExecutionError_to_RunResult(exc)
-            traceback.print_exc()            
+        result = self.core.resume(thread_id, checkpoint_id, resume_value)
         
         _print_result(result)
         _print_tips_to_stderr(result)
@@ -136,22 +131,10 @@ class CliApp:
         checkpoint_id: str = typer.Option(..., "--checkpoint-id", help="Checkpoint identifier."),
     ) -> None:
         """Retry the failed node of a graph execution."""
-        try:
-            result = self.core.retry(thread_id, checkpoint_id)
-        except GraphExecutionError as exc:
-            # Convert GraphExecutionError to RunResult for consistent CLI output
-            result = self._GraphExecutionError_to_RunResult(exc)
-            traceback.print_exc()            
+        result = self.core.retry(thread_id, checkpoint_id)
         
         _print_result(result)
         _print_tips_to_stderr(result)
-
-    def _GraphExecutionError_to_RunResult(self, exc):
-        return RunResult(
-                thread_id=exc.get_thread_id(),
-                checkpoint_id=exc.get_checkpoint_id(),
-                error_message=str(exc.__cause__),
-            )
 
     def __call__(self) -> None:
         """Invoke the CLI application."""
