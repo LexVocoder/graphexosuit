@@ -99,11 +99,7 @@ class CliApp:
             result = self.core.run(initial_state, thread_id=thread_id)
         except GraphExecutionError as exc:
             # Convert GraphExecutionError to RunResult for consistent CLI output
-            result = RunResult(
-                thread_id=exc.get_thread_id(),
-                checkpoint_id=exc.get_checkpoint_id(),
-                error_message=str(exc.get_original_exception()),
-            )
+            result = self._GraphExecutionError_to_RunResult(exc)
         
         _print_result(result)
         _print_tips_to_stderr(result)
@@ -126,11 +122,7 @@ class CliApp:
             result = self.core.resume(thread_id, checkpoint_id, resume_value)
         except GraphExecutionError as exc:
             # Convert GraphExecutionError to RunResult for consistent CLI output
-            result = RunResult(
-                thread_id=exc.get_thread_id(),
-                checkpoint_id=exc.get_checkpoint_id(),
-                error_message=str(exc.get_original_exception()),
-            )
+            result = self._GraphExecutionError_to_RunResult(exc)
         
         _print_result(result)
         _print_tips_to_stderr(result)
@@ -145,14 +137,17 @@ class CliApp:
             result = self.core.retry(thread_id, checkpoint_id)
         except GraphExecutionError as exc:
             # Convert GraphExecutionError to RunResult for consistent CLI output
-            result = RunResult(
-                thread_id=exc.get_thread_id(),
-                checkpoint_id=exc.get_checkpoint_id(),
-                error_message=str(exc.get_original_exception()),
-            )
+            result = self._GraphExecutionError_to_RunResult(exc)
         
         _print_result(result)
         _print_tips_to_stderr(result)
+
+    def _GraphExecutionError_to_RunResult(self, exc):
+        return RunResult(
+                thread_id=exc.get_thread_id(),
+                checkpoint_id=exc.get_checkpoint_id(),
+                error_message=str(exc.__cause__),
+            )
 
     def __call__(self) -> None:
         """Invoke the CLI application."""

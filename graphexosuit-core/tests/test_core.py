@@ -261,9 +261,9 @@ class TestExosuitCoreRun:
         
         error = exc_info.value
         assert "Graph execution failed" in str(error)
-        assert error.get_original_exception() is not None
-        assert isinstance(error.get_original_exception(), RuntimeError)
-        assert "first attempt failed" in str(error.get_original_exception())
+        assert error.__cause__ is not None
+        assert isinstance(error.__cause__, RuntimeError)
+        assert "first attempt failed" in str(error.__cause__)
         assert error.get_thread_id() is not None
 
     def test_run_invalid_interrupt_raises_graph_execution_error(self):
@@ -276,7 +276,7 @@ class TestExosuitCoreRun:
         error = exc_info.value
         assert error.get_thread_id() is not None
         # The original error is a serialization error from msgpack
-        assert "Type is not msgpack serializable" in str(error.get_original_exception())
+        assert "Type is not msgpack serializable" in str(error.__cause__)
 
     def test_run_without_transform_initial_state_passes_unchanged(self):
         """When liner has no transform_initial_state, initial_state is passed to _invoke unchanged."""
@@ -460,8 +460,8 @@ class TestExosuitCoreRetry:
         assert on_retry_called["thread_id"] == err.get_thread_id()
         assert on_retry_called["checkpoint_id"] == checkpoint_id
 
-    def test_retry_on_retry_hook_throws_logs_stderr(self, capsys):
-        """When on_retry hook throws, stderr is logged and error RunResult is returned."""
+    def test_retry_on_retry_hook_throws_raises_error(self):
+        """When on_retry hook throws, retry() raises GraphExecutionError."""
         core = _make_core(_error_graph)
         
         # Add on_retry method that throws
@@ -477,18 +477,15 @@ class TestExosuitCoreRetry:
         err = exc_info.value
         checkpoint_id = err.get_checkpoint_id()
         
-        # Retry - should return error RunResult because on_retry hook threw
-        result = core.retry(err.get_thread_id(), checkpoint_id)
+        # Retry - should raise GraphExecutionError because on_retry hook threw
+        with pytest.raises(GraphExecutionError) as retry_exc_info:
+            core.retry(err.get_thread_id(), checkpoint_id)
         
-        # Verify stderr was logged
-        captured = capsys.readouterr()
-        assert captured.err != ""
-        assert "on_retry failed" in captured.err
-        
-        # Verify result is an error
-        assert result.final_result is None
-        assert result.error_message  # truthy
-        assert "on_retry" in result.error_message
+        # Verify the error is about on_retry
+        retry_err = retry_exc_info.value
+        assert "on_retry" in str(retry_err)
+        assert isinstance(retry_err.__cause__, RuntimeError)
+        assert "on_retry failed" in str(retry_err.__cause__)
 
     def test_retry_graph_executes_again_and_recovers(self):
         """When retry is called, graph executes again and can recover from errors."""
@@ -545,62 +542,6 @@ class TestExosuitCoreBuildRunResult:
         # Result should pass through without modification
         assert result.final_result == {"value": "test"}
         assert result.error_message is None
-
-
-# ---------------------------------------------------------------------------
-# ExosuitCore._log_and_create_error_result
-# ---------------------------------------------------------------------------
-
-class TestExosuitCoreLogAndCreateErrorResult:
-    def test_log_and_create_error_result_with_prefix(self, capsys):
-        """Test _log_and_create_error_result with error_prefix."""
-        core = _make_core(_simple_graph)
-        exc = ValueError("test error")
-
-        result = core._log_and_create_error_result(
-            exc=exc,
-            thread_id="t1",
-            error_prefix="Custom prefix",
-            checkpoint_id="cid1",
-        )
-
-        # Verify stderr was written to
-        captured = capsys.readouterr()
-        assert "test error" in captured.err
-        assert "ValueError" in captured.err
-
-        # Verify result is valid and has expected error format
-        assert result.final_result is None
-        assert result.interrupt_value is None
-        assert result.error_message is not None
-        assert "Custom prefix" in result.error_message
-        assert "test error" in result.error_message
-        assert result.thread_id == "t1"
-        assert result.checkpoint_id == "cid1"
-
-    def test_log_and_create_error_result_without_prefix(self, capsys):
-        """Test _log_and_create_error_result without error_prefix."""
-        core = _make_core(_simple_graph)
-        exc = RuntimeError("boom")
-
-        result = core._log_and_create_error_result(
-            exc=exc,
-            thread_id="t2",
-            checkpoint_id="cid2",
-        )
-
-        # Verify stderr was written to
-        captured = capsys.readouterr()
-        assert "boom" in captured.err
-        assert "RuntimeError" in captured.err
-
-        # Verify result is valid and has expected error format
-        assert result.final_result is None
-        assert result.interrupt_value is None
-        assert result.error_message is not None
-        assert result.error_message == "boom"
-        assert result.thread_id == "t2"
-        assert result.checkpoint_id == "cid2"
 
 
 # ---------------------------------------------------------------------------
