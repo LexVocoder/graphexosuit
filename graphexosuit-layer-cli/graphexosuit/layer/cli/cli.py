@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+import traceback
 import typer
 from dataclasses import asdict
 from shlex import quote
@@ -100,6 +101,7 @@ class CliApp:
         except GraphExecutionError as exc:
             # Convert GraphExecutionError to RunResult for consistent CLI output
             result = self._GraphExecutionError_to_RunResult(exc)
+            traceback.print_exc()
         
         _print_result(result)
         _print_tips_to_stderr(result)
@@ -123,6 +125,7 @@ class CliApp:
         except GraphExecutionError as exc:
             # Convert GraphExecutionError to RunResult for consistent CLI output
             result = self._GraphExecutionError_to_RunResult(exc)
+            traceback.print_exc()            
         
         _print_result(result)
         _print_tips_to_stderr(result)
@@ -138,6 +141,7 @@ class CliApp:
         except GraphExecutionError as exc:
             # Convert GraphExecutionError to RunResult for consistent CLI output
             result = self._GraphExecutionError_to_RunResult(exc)
+            traceback.print_exc()            
         
         _print_result(result)
         _print_tips_to_stderr(result)
