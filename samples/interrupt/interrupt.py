@@ -7,13 +7,15 @@
 from __future__ import annotations
 
 import os
+import traceback
 from typing import Any, TypedDict
 
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
 
-from graphexosuit.core import StandardizedInterrupt, InterruptOption, ExosuitLiner
+from graphexosuit.core import ExosuitLiner, GraphExecutionError, InterruptOption, StandardizedInterrupt
+from graphexosuit.layer.cli import print_retry_tip_to_stderr
 
 # Graph nodes
 
@@ -72,4 +74,8 @@ class InterruptLiner(ExosuitLiner):
 if __name__ == "__main__":
     from graphexosuit.layer.cli import CliApp
     cli = CliApp(InterruptLiner())
-    cli()
+    try:
+        cli()
+    except GraphExecutionError as exc:
+        traceback.print_exc()
+        print_retry_tip_to_stderr(exc)
