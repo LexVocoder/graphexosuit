@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import sys
+import traceback
 import typer
 from dataclasses import asdict
 from shlex import quote
@@ -14,7 +15,16 @@ from typing import Any, Optional
 from graphexosuit.core import ExosuitCore, ExosuitLiner, RunResult, GraphExecutionError
 
 
-def print_retry_tip_to_stderr(exc: GraphExecutionError) -> None:
+def _get_quoted_program_name() -> str:
+    return quote(sys.argv[0] if len(sys.argv) > 0 else "graphexosuit")
+
+
+def _print_result(result) -> None:
+    """Serialize a RunResult to JSON and print it to stdout."""
+    print(json.dumps(asdict(result), default=str, indent=2))
+
+
+def _print_retry_tip_to_stderr(exc: GraphExecutionError) -> None:
     """Print a retry tip to stderr based on useful values in GraphExecutionError."""
 
     tip = "Graph execution failed. To retry, run:\n"
@@ -25,30 +35,8 @@ def print_retry_tip_to_stderr(exc: GraphExecutionError) -> None:
     print(tip, file=sys.stderr)
 
 
-def _get_quoted_program_name() -> str:
-    return quote(sys.argv[0] if len(sys.argv) > 0 else "graphexosuit")
-
-
-def _to_cli_args(thread_id: str, checkpoint_id: Optional[str]) -> str:
-    """Build CLI arguments needed to reconstruct a run context.
-
-    Args:
-        thread_id: The thread identifier to include as `--thread-id`.
-        checkpoint_id: Optional checkpoint identifier to include as `--checkpoint-id`.
-    """
-    args = f"--thread-id {quote(thread_id)} "
-    if checkpoint_id:
-        args += f"--checkpoint-id {quote(checkpoint_id)} "
-    return args
-
-
-def _print_result(result) -> None:
-    """Serialize a RunResult to JSON and print it to stdout."""
-    print(json.dumps(asdict(result), default=str, indent=2))
-
-
 def _print_tips_to_stderr(run_result: RunResult) -> None:
-    """Print re-execution tips to stderr if the graph execution did not complete."""
+    """Print re-execution tips to stderr since the graph execution did not complete."""
     if run_result.interrupt_value is None:
         return
 
@@ -64,6 +52,19 @@ def _print_tips_to_stderr(run_result: RunResult) -> None:
         tip += f"--resume-value {quote(json.dumps(option.payload))}"
 
     print(tip, file=sys.stderr)
+
+
+def _to_cli_args(thread_id: str, checkpoint_id: Optional[str]) -> str:
+    """Build CLI arguments needed to reconstruct a run context.
+
+    Args:
+        thread_id: The thread identifier to include as `--thread-id`.
+        checkpoint_id: Optional checkpoint identifier to include as `--checkpoint-id`.
+    """
+    args = f"--thread-id {quote(thread_id)} "
+    if checkpoint_id:
+        args += f"--checkpoint-id {quote(checkpoint_id)} "
+    return args
 
 
 class CliApp:
@@ -87,24 +88,13 @@ class CliApp:
         self.app.command()(self.resume)
         self.app.command()(self.retry)
 
-    def run(
-        self,
-        initial_state_json: str = typer.Option(..., "--initial-state", help="Graph input dict as a JSON string."),
-        thread_id: Optional[str] = typer.Option(
-            None, "--thread-id", help="Optional thread identifier."
-        ),
-    ) -> None:
-        """Run the graph from the beginning."""
-        try:
-            initial_state = json.loads(initial_state_json)
-        except json.JSONDecodeError as exc:
-            typer.echo(f"Invalid JSON for --initial-state: {exc}", err=True)
-            raise typer.Exit(code=1)
+    def report_exc(self, exc: Exception) -> None:
+        """Report an exception to the user. Add tips on retrying iff exc is a GraphExecutionError."""
 
-        result = self.core.run(initial_state, thread_id=thread_id)
+        traceback.print_exception(exc, file=sys.stderr)
 
-        _print_result(result)
-        _print_tips_to_stderr(result)
+        if isinstance(exc, GraphExecutionError):
+            _print_retry_tip_to_stderr(exc)
 
     def resume(
         self,
@@ -133,6 +123,25 @@ class CliApp:
         """Retry the failed node of a graph execution."""
         result = self.core.retry(thread_id, checkpoint_id)
         
+        _print_result(result)
+        _print_tips_to_stderr(result)
+
+    def run(
+        self,
+        initial_state_json: str = typer.Option(..., "--initial-state", help="Graph input dict as a JSON string."),
+        thread_id: Optional[str] = typer.Option(
+            None, "--thread-id", help="Optional thread identifier."
+        ),
+    ) -> None:
+        """Run the graph from the beginning."""
+        try:
+            initial_state = json.loads(initial_state_json)
+        except json.JSONDecodeError as exc:
+            typer.echo(f"Invalid JSON for --initial-state: {exc}", err=True)
+            raise typer.Exit(code=1)
+
+        result = self.core.run(initial_state, thread_id=thread_id)
+
         _print_result(result)
         _print_tips_to_stderr(result)
 

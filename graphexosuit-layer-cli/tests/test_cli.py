@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 import types as _types
@@ -237,3 +238,54 @@ class TestRetryCommand:
         assert result2.exit_code == 0, result2.output
         data2 = _parse_json(result2.output)
         assert data2["final_result"] is not None
+
+
+# ---------------------------------------------------------------------------
+# report_exc method
+# ---------------------------------------------------------------------------
+
+class TestReportExc:
+    def test_report_exc_with_generic_exception(self):
+        """report_exc() should print traceback but no retry tip for generic exceptions."""
+        cli = _get_cli()
+        generic_exc = ValueError("something went wrong")
+        
+        # Capture stderr to verify output
+        captured_stderr = io.StringIO()
+        original_stderr = sys.stderr
+        try:
+            sys.stderr = captured_stderr
+            cli.report_exc(generic_exc)
+        finally:
+            sys.stderr = original_stderr
+        
+        stderr_output = captured_stderr.getvalue()
+        # Should contain traceback but NOT retry tip
+        assert "ValueError: something went wrong" in stderr_output
+        assert "retry" not in stderr_output
+
+    def test_report_exc_with_graph_execution_error(self):
+        """report_exc() should print traceback AND retry tip for GraphExecutionError."""
+        cli = _get_cli()
+        exc = GraphExecutionError(
+            message="Graph execution failed",
+            original_exception=RuntimeError("test failure"),
+            thread_id="test-thread",
+            checkpoint_id="test-checkpoint",
+        )
+        
+        # Capture stderr to verify output
+        captured_stderr = io.StringIO()
+        original_stderr = sys.stderr
+        try:
+            sys.stderr = captured_stderr
+            cli.report_exc(exc)
+        finally:
+            sys.stderr = original_stderr
+        
+        stderr_output = captured_stderr.getvalue()
+        # Should contain both traceback and retry tip
+        assert "GraphExecutionError" in stderr_output
+        assert "retry" in stderr_output
+        assert "test-thread" in stderr_output
+        assert "test-checkpoint" in stderr_output

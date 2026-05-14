@@ -14,8 +14,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
 
-from graphexosuit.core import ExosuitLiner, GraphExecutionError, InterruptOption, StandardizedInterrupt
-from graphexosuit.layer.cli import print_retry_tip_to_stderr
+from graphexosuit.core import ExosuitLiner, InterruptOption, StandardizedInterrupt
 
 # Graph nodes
 
@@ -76,6 +75,5 @@ if __name__ == "__main__":
     cli = CliApp(InterruptLiner())
     try:
         cli()
-    except GraphExecutionError as exc:
-        traceback.print_exc()
-        print_retry_tip_to_stderr(exc)
+    except Exception as exc:
+        cli.report_exc(exc)
