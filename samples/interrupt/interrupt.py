@@ -27,6 +27,9 @@ def initialize(state):
     return state
 
 def node(state):
+    if state["value"] == "fail":
+        raise ValueError("state['value'] was 'fail'")
+
     post_interrupt_data = interrupt(
         StandardizedInterrupt(
             message="Choose an ice cream flavor",
