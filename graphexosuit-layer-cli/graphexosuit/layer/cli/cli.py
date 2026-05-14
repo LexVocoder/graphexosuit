@@ -10,7 +10,7 @@ import traceback
 import typer
 from dataclasses import asdict
 from shlex import quote
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from graphexosuit.core import ExosuitCore, ExosuitLiner, RunResult, GraphExecutionError
 
@@ -88,13 +88,15 @@ class CliApp:
         self.app.command()(self.resume)
         self.app.command()(self.retry)
 
-    def report_exc(self, exc: Exception) -> None:
-        """Report an exception to the user. Add tips on retrying iff exc is a GraphExecutionError."""
+    def report_exc(self, exc: Exception, exit: Callable[[int], None] = sys.exit) -> None:
+        """Report an exception to the user and calls `sys.exit(1)`. Add tips on retrying iff exc is a GraphExecutionError."""
 
         traceback.print_exception(exc, file=sys.stderr)
 
         if isinstance(exc, GraphExecutionError):
             _print_retry_tip_to_stderr(exc)
+        
+        exit(1)
 
     def resume(
         self,

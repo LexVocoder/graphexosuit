@@ -253,9 +253,15 @@ class TestReportExc:
         # Capture stderr to verify output
         captured_stderr = io.StringIO()
         original_stderr = sys.stderr
+        exit_code_captured = None
+        
+        def mock_exit(code: int) -> None:
+            nonlocal exit_code_captured
+            exit_code_captured = code
+        
         try:
             sys.stderr = captured_stderr
-            cli.report_exc(generic_exc)
+            cli.report_exc(generic_exc, exit=mock_exit)
         finally:
             sys.stderr = original_stderr
         
@@ -263,6 +269,8 @@ class TestReportExc:
         # Should contain traceback but NOT retry tip
         assert "ValueError: something went wrong" in stderr_output
         assert "retry" not in stderr_output
+        # Should have called exit(1)
+        assert exit_code_captured == 1
 
     def test_report_exc_with_graph_execution_error(self):
         """report_exc() should print traceback AND retry tip for GraphExecutionError."""
@@ -277,9 +285,15 @@ class TestReportExc:
         # Capture stderr to verify output
         captured_stderr = io.StringIO()
         original_stderr = sys.stderr
+        exit_code_captured = None
+        
+        def mock_exit(code: int) -> None:
+            nonlocal exit_code_captured
+            exit_code_captured = code
+        
         try:
             sys.stderr = captured_stderr
-            cli.report_exc(exc)
+            cli.report_exc(exc, exit=mock_exit)
         finally:
             sys.stderr = original_stderr
         
@@ -289,3 +303,5 @@ class TestReportExc:
         assert "retry" in stderr_output
         assert "test-thread" in stderr_output
         assert "test-checkpoint" in stderr_output
+        # Should have called exit(1)
+        assert exit_code_captured == 1
