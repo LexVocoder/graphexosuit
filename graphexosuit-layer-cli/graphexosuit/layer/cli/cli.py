@@ -89,7 +89,7 @@ class CliApp:
         self.app.command()(self.retry)
 
     def report_exc(self, exc: Exception, exit: Callable[[int], None] = sys.exit) -> None:
-        """Report an exception to the user and calls `sys.exit(1)`. Add tips on retrying iff exc is a GraphExecutionError."""
+        """Report an exception to the user and call `sys.exit(1)`. Add tips on retrying iff exc is a GraphExecutionError."""
 
         traceback.print_exception(exc, file=sys.stderr)
 
