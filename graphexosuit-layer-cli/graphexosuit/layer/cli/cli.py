@@ -88,8 +88,10 @@ class CliApp:
         self.app.command()(self.resume)
         self.app.command()(self.retry)
 
-    def report_exc(self, exc: Exception, exit: Callable[[int], None] = sys.exit) -> None:
-        """Report an exception to the user and call `sys.exit(1)`. Add tips on retrying iff exc is a GraphExecutionError."""
+    def confess(self, exc: Exception, exit: Callable[[int], None] = sys.exit) -> None:
+        """Report a stack trace to stderr, show optional retry tips, and then call `sys.exit(1)`. Tips appear iff exc is a GraphExecutionError.
+        
+        This is named after the `confess` function in Perl, which also prints a stack trace before exiting with an error code."""
 
         traceback.print_exception(exc, file=sys.stderr)
 

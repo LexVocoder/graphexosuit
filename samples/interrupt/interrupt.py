@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import os
-import traceback
 from typing import Any, TypedDict
 
 from langgraph.checkpoint.sqlite import SqliteSaver
@@ -73,10 +72,11 @@ class InterruptLiner(ExosuitLiner):
         builder.set_finish_point("node")
         return builder
 
+
 if __name__ == "__main__":
     from graphexosuit.layer.cli import CliApp
     cli = CliApp(InterruptLiner())
     try:
         cli()
     except Exception as exc:
-        cli.report_exc(exc)
+        cli.confess(exc)

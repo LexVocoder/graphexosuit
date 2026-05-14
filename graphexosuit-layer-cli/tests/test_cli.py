@@ -241,12 +241,12 @@ class TestRetryCommand:
 
 
 # ---------------------------------------------------------------------------
-# report_exc method
+# confess method
 # ---------------------------------------------------------------------------
 
 class TestReportExc:
-    def test_report_exc_with_generic_exception(self):
-        """report_exc() should print traceback but no retry tip for generic exceptions."""
+    def test_confess_with_generic_exception(self):
+        """confess() should print traceback but no retry tip for generic exceptions."""
         cli = _get_cli()
         generic_exc = ValueError("something went wrong")
         
@@ -261,7 +261,7 @@ class TestReportExc:
         
         try:
             sys.stderr = captured_stderr
-            cli.report_exc(generic_exc, exit=mock_exit)
+            cli.confess(generic_exc, exit=mock_exit)
         finally:
             sys.stderr = original_stderr
         
@@ -272,8 +272,8 @@ class TestReportExc:
         # Should have called exit(1)
         assert exit_code_captured == 1
 
-    def test_report_exc_with_graph_execution_error(self):
-        """report_exc() should print traceback AND retry tip for GraphExecutionError."""
+    def test_confess_with_graph_execution_error(self):
+        """confess() should print traceback AND retry tip for GraphExecutionError."""
         cli = _get_cli()
         exc = GraphExecutionError(
             message="Graph execution failed",
@@ -293,7 +293,7 @@ class TestReportExc:
         
         try:
             sys.stderr = captured_stderr
-            cli.report_exc(exc, exit=mock_exit)
+            cli.confess(exc, exit=mock_exit)
         finally:
             sys.stderr = original_stderr
         
