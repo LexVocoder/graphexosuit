@@ -88,8 +88,24 @@ def _validate_interrupt_value(value: Any) -> None:
 
 
 def _extract_checkpoint_id(graph: Any, config: RunnableConfig) -> str:
-    """Return the latest checkpoint ID from the graph state, or 'unknown' if not available."""
-    state = graph.get_state(config)
+    """Return the latest checkpoint ID from the graph state, or 'unknown' if not available.
+
+    We strip ``checkpoint_id`` from the config before calling ``get_state`` so
+    that LangGraph resolves the *latest* state for the thread rather than the
+    state at the specific checkpoint that was passed in.  If we leave
+    ``checkpoint_id`` in place, ``get_state`` returns the snapshot at that exact
+    checkpoint, which means a second interrupt inside a ``resume()`` call would
+    still report the *first* interrupt's checkpoint — causing an infinite
+    re-interruption loop on subsequent resumes.
+    """
+    # Only forward thread_id so LangGraph returns the latest state, not the
+    # state pinned to a specific (and now stale) checkpoint_id.
+    latest_config: RunnableConfig = {
+        "configurable": {
+            "thread_id": config["configurable"]["thread_id"],
+        }
+    }
+    state = graph.get_state(latest_config)
     return state.config["configurable"].get("checkpoint_id", "unknown")
 
 

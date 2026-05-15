@@ -598,3 +598,126 @@ class TestExosuitCoreCompile:
         assert result.interrupt_value is not None
         assert result.checkpoint_id is not None
 
+
+# ---------------------------------------------------------------------------
+# Helpers: double-interrupt graph (regression for stale checkpoint_id)
+# ---------------------------------------------------------------------------
+
+class DoubleInterruptState(TypedDict):
+    step: int
+
+
+def _double_interrupt_graph() -> StateGraph:
+    """Graph with two sequential interrupt nodes: interrupt1 → interrupt2 → END.
+
+    Used to exercise the stale-checkpoint regression: when resume() hits a
+    *second* interrupt, _extract_checkpoint_id must return the checkpoint
+    created by that second interrupt, not the one from the first.
+    """
+    builder = StateGraph(DoubleInterruptState)
+
+    def node_interrupt1(state: DoubleInterruptState) -> dict:
+        interrupt(
+            StandardizedInterrupt(
+                message="First approval needed",
+                options=[InterruptOption(label="Approve", payload="approved")],
+            )
+        )
+        return {"step": state["step"] + 1}
+
+    def node_interrupt2(state: DoubleInterruptState) -> dict:
+        interrupt(
+            StandardizedInterrupt(
+                message="Second approval needed",
+                options=[InterruptOption(label="Approve", payload="approved")],
+            )
+        )
+        return {"step": state["step"] + 1}
+
+    builder.add_node("node_interrupt1", node_interrupt1)
+    builder.add_node("node_interrupt2", node_interrupt2)
+    builder.set_entry_point("node_interrupt1")
+    builder.add_edge("node_interrupt1", "node_interrupt2")
+    builder.add_edge("node_interrupt2", END)
+    return builder
+
+
+# ---------------------------------------------------------------------------
+# Double-interrupt regression tests
+# ---------------------------------------------------------------------------
+
+class TestDoubleInterruptRegression:
+    """Regression tests for the stale checkpoint_id bug.
+
+    Before the fix, resume() returned the *first* interrupt's checkpoint_id
+    even after hitting a second interrupt, causing an infinite re-interruption
+    loop on subsequent resumes.
+    """
+
+    def _run_to_first_interrupt(self):
+        """Return (core, r1) where r1 is paused at node_interrupt1."""
+        core = _make_core(_double_interrupt_graph)
+        r1 = core.run({"step": 0}, thread_id="double-interrupt-thread")
+        assert r1.interrupt_value is not None, "Expected pause at node_interrupt1"
+        assert "First" in r1.interrupt_value.message
+        return core, r1
+
+    def test_resume_after_first_interrupt_pauses_at_second(self):
+        """resume() from interrupt1 must pause at interrupt2, not loop back."""
+        core, r1 = self._run_to_first_interrupt()
+        assert r1.checkpoint_id is not None
+
+        r2 = core.resume(r1.thread_id, r1.checkpoint_id, "approved")
+        assert r2.interrupt_value is not None, "Expected pause at node_interrupt2"
+        assert "Second" in r2.interrupt_value.message
+
+    def test_resume_after_first_interrupt_returns_distinct_checkpoint_id(self):
+        """The checkpoint_id returned after hitting interrupt2 must differ from interrupt1's.
+
+        This is the direct observable symptom of the bug: both runs returned the
+        same checkpoint_id, making it impossible to resume from the correct position.
+        """
+        core, r1 = self._run_to_first_interrupt()
+        assert r1.checkpoint_id is not None
+
+        r2 = core.resume(r1.thread_id, r1.checkpoint_id, "approved")
+        assert r2.checkpoint_id != r1.checkpoint_id, (
+            "checkpoint_id after the second interrupt must not equal the first interrupt's "
+            "checkpoint_id — the bug caused them to be identical"
+        )
+
+    def test_resume_from_second_interrupt_completes_graph(self):
+        """Resuming from interrupt2's checkpoint_id must complete the graph, not re-run interrupt1.
+
+        With the bug, step would be 1 (interrupt1 re-ran) instead of 2 (both
+        interrupts executed exactly once in order).
+        """
+        core, r1 = self._run_to_first_interrupt()
+        assert r1.checkpoint_id is not None
+
+        r2 = core.resume(r1.thread_id, r1.checkpoint_id, "approved")
+        assert r2.checkpoint_id is not None
+
+        r3 = core.resume(r2.thread_id, r2.checkpoint_id, "approved")
+        assert r3.final_result is not None, "Graph should have completed"
+        assert r3.final_result.get("step") == 2, (
+            f"Expected step=2 (both interrupts ran once), got step={r3.final_result.get('step')}. "
+            "node_interrupt1 likely re-ran due to the stale checkpoint_id bug."
+        )
+
+    def test_resume_from_second_interrupt_does_not_repeat_first_interrupt(self):
+        """After resuming from interrupt2, the graph must not re-trigger interrupt1's message."""
+        core, r1 = self._run_to_first_interrupt()
+        assert r1.checkpoint_id is not None
+
+        r2 = core.resume(r1.thread_id, r1.checkpoint_id, "approved")
+        assert r2.checkpoint_id is not None
+
+        r3 = core.resume(r2.thread_id, r2.checkpoint_id, "approved")
+        # If interrupt1 re-ran, r3 would have an interrupt_value with "First" in the message.
+        assert r3.interrupt_value is None, (
+            "Graph should have completed, but got another interrupt. "
+            "node_interrupt1 likely re-ran due to the stale checkpoint_id bug. "
+            f"Interrupt message: {r3.interrupt_value.message if r3.interrupt_value else 'N/A'}"
+        )
+
