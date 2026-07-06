@@ -20,12 +20,17 @@ from graphexosuit.core import ExosuitLiner, InterruptOption, StandardizedInterru
 def initialize(state):
     """Standard initialization node that ensures entire initial state is both valid and captured in the first checkpoint, making it available for resuming and retrying even if the graph fails or is interrupted immediately thereafter."""
 
+    print("Initializing graph...")
+
     if not state or "value" not in state:
         raise KeyError(f"Initial state must have 'value' key; got {repr(state)}")
 
     return state
 
 def node(state):
+
+    print("Executing node...")
+
     if state["value"] == "fail":
         raise ValueError("state['value'] was 'fail'")
 
@@ -72,11 +77,3 @@ class InterruptLiner(ExosuitLiner):
         builder.set_finish_point("node")
         return builder
 
-
-if __name__ == "__main__":
-    from graphexosuit.layer.cli import CliApp
-    cli = CliApp(InterruptLiner())
-    try:
-        cli()
-    except Exception as exc:
-        cli.confess(exc)
