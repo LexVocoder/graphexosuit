@@ -10,14 +10,15 @@ Responsibilities:
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from graphexosuit.core import RunResult
 
 
 def build_resume_url(thread_id: str, checkpoint_id: str) -> str:
-    """Return the ``/api/resume`` URL for one interrupt option.
+    """Return the resumption URL for one interrupt option.
 
-    The URL contains only thread_id and checkpoint_id. The resume_value must be
+    The URL contains only thread_id and checkpoint_id; the resume_value must be
     sent in the request body when clients POST to this URL. This design supports
     arbitrarily large payloads and follows REST best practices.
 
@@ -64,6 +65,12 @@ def transform_run_result(result: RunResult) -> dict:
         ValueError: If ``result`` is neither paused nor complete (invalid state).
     """
     if result.interrupt_value is not None:
+        if result.checkpoint_id is None:
+            raise ValueError(
+                f"RunResult for thread_id {result.thread_id!r} has interrupt_value set "
+                "but checkpoint_id is None. This suggests a programming error in graphexosuit."
+            )
+
         # ## Paused branch
         options_payload = [
             {
@@ -72,7 +79,7 @@ def transform_run_result(result: RunResult) -> dict:
                     thread_id=result.thread_id,
                     # checkpoint_id is guaranteed non-None when interrupt_value is set
                     # (enforced by RunResult.__post_init__)
-                    checkpoint_id=result.checkpoint_id,  # type: ignore[arg-type]
+                    checkpoint_id=result.checkpoint_id,
                 ),
             }
             for option in result.interrupt_value.options

@@ -11,7 +11,6 @@ from langchain_core.stores import BaseStore
 
 from graphexosuit.core import ExosuitLiner, InterruptOption, StandardizedInterrupt
 from graphexosuit.layer.backend import create_app
-from graphexosuit.core.liner_validator import validate_liner
 from graphexosuit.layer.backend.transformers import transform_run_result, build_resume_url
 from graphexosuit.layer.backend.error_responses import build_retry_url, error_response_500
 
@@ -129,49 +128,12 @@ def _make_client() -> TestClient:
 
 
 # ===========================================================================
-# Unit tests: liner_validator
+# Unit tests: create_app
 # ===========================================================================
 
-class TestLinerValidator:
-    def test_valid_liner_passes(self) -> None:
-        """A fully-conformant Liner must not raise."""
-        validate_liner(_TestLiner())
-
-    def test_none_liner_raises_value_error(self) -> None:
-        """None must be rejected with a descriptive message."""
-        with pytest.raises(ValueError, match="must not be None"):
-            validate_liner(None)
-
-    def test_missing_get_graph_raises(self) -> None:
-        """A Liner without get_graph must be rejected."""
-        class _NoGraph:
-            def get_checkpointer_cm(self) -> Any:
-                return None
-
-        with pytest.raises(ValueError, match="get_graph"):
-            validate_liner(_NoGraph())
-
-    def test_missing_get_checkpointer_cm_raises(self) -> None:
-        """A Liner without get_checkpointer_cm must be rejected."""
-        class _NoCheckpointer:
-            def get_graph(self) -> Any:
-                return None
-
-        with pytest.raises(ValueError, match="get_checkpointer_cm"):
-            validate_liner(_NoCheckpointer())
-
-    def test_non_callable_method_raises(self) -> None:
-        """Attributes that are not callable must be treated as missing."""
-        class _BadLiner:
-            get_graph = "not_a_function"
-            def get_checkpointer_cm(self) -> Any:
-                return None
-
-        with pytest.raises(ValueError, match="get_graph"):
-            validate_liner(_BadLiner())
-
+class TestCreateApp:
     def test_create_app_raises_on_invalid_liner(self) -> None:
-        """create_app must propagate validate_liner's ValueError at construction time."""
+        """create_app must propagate liner validation error at construction time."""
         store = _InMemoryExecutionDataStore()
         with pytest.raises(ValueError):
             create_app(None, store)  # type: ignore[arg-type]
@@ -183,16 +145,16 @@ class TestLinerValidator:
 
 class TestErrorResponses:
     def test_build_retry_url_format(self) -> None:
-        """retry URL must contain thread_id and checkpoint_id as query params."""
+        """retry URL must contain thread_id and checkpoint_id as path segments."""
         url = build_retry_url("t-123", "ckpt-456")
-        assert "/api/retry?" in url
-        assert "thread_id=t-123" in url
-        assert "checkpoint_id=ckpt-456" in url
+        assert "/retry" in url
+        assert "/thread/t-123/" in url
+        assert "/checkpoint/ckpt-456/" in url
 
     def test_build_retry_url_encodes_special_chars(self) -> None:
         """Special characters in IDs must be percent-encoded."""
         url = build_retry_url("t/123", "ckpt 456")
-        assert "t%2F123" in url or "t/123" not in url  # URL-encoded slash
+        assert "t%2F123" in url and "t/123" not in url  # URL-encoded slash
         assert "ckpt+456" in url or "ckpt%20456" in url  # URL-encoded space
 
     def test_error_response_500_shape(self) -> None:
@@ -202,7 +164,7 @@ class TestErrorResponses:
         assert body["error"] == "boom"
         assert body["thread_id"] == "t-1"
         assert body["checkpoint_id"] == "ckpt-1"
-        assert "/api/retry" in body["retry_url"]
+        assert "/retry" in body["retry_url"]
 
     def test_error_response_500_retry_url_contains_ids(self) -> None:
         """The retry_url inside a 500 response must embed the provided IDs."""

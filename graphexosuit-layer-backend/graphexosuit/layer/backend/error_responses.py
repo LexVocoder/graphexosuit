@@ -8,22 +8,18 @@ Responsibilities:
 
 from __future__ import annotations
 
-from urllib.parse import urlencode
+from urllib.parse import quote
 
 
 def build_retry_url(thread_id: str, checkpoint_id: str) -> str:
-    """Return the ``/api/retry`` URL for a failed execution.
+    """Return the retry URL for a failed execution.
 
     Args:
         thread_id: The thread identifier of the failed execution.
         checkpoint_id: The checkpoint at which the failure occurred.
     """
-    encoded_params = urlencode({
-        "thread_id": thread_id,
-        "checkpoint_id": checkpoint_id,
-    })
-    return f"/api/retry?{encoded_params}"
-
+    return f"/thread/{quote(thread_id, safe='')}/checkpoint/{quote(checkpoint_id, safe='')}/retry"
+    
 
 def error_response_500(
     error: Exception,

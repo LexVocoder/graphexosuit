@@ -20,6 +20,7 @@ from graphexosuit.core import (
     InvalidInterruptError,
     GraphExecutionError,
 )
+from graphexosuit.core.liner_validator import validate_liner
 
 
 # ---------------------------------------------------------------------------
@@ -719,4 +720,57 @@ class TestDoubleInterruptRegression:
             "node_interrupt1 likely re-ran due to the stale checkpoint_id bug. "
             f"Interrupt message: {r3.interrupt_value.message if r3.interrupt_value else 'N/A'}"
         )
+
+
+# ===========================================================================
+# Unit tests: liner_validator
+# ===========================================================================
+
+class TestLinerValidator:
+    """Tests for the liner_validator module."""
+
+    def test_valid_liner_passes(self) -> None:
+        """A fully-conformant Liner must not raise."""
+        class _TestLiner(ExosuitLiner):
+            def get_graph(self) -> Any:
+                return _simple_graph().compile(checkpointer=MemorySaver())
+
+            def get_checkpointer_cm(self) -> Any:
+                return _CheckpointerContextManager(MemorySaver())
+
+        validate_liner(_TestLiner())
+
+    def test_none_liner_raises_value_error(self) -> None:
+        """None must be rejected with a descriptive message."""
+        with pytest.raises(ValueError, match="must not be None"):
+            validate_liner(None)
+
+    def test_missing_get_graph_raises(self) -> None:
+        """A Liner without get_graph must be rejected."""
+        class _NoGraph:
+            def get_checkpointer_cm(self) -> Any:
+                return None
+
+        with pytest.raises(ValueError, match="get_graph"):
+            validate_liner(_NoGraph())
+
+    def test_missing_get_checkpointer_cm_raises(self) -> None:
+        """A Liner without get_checkpointer_cm must be rejected."""
+        class _NoCheckpointer:
+            def get_graph(self) -> Any:
+                return None
+
+        with pytest.raises(ValueError, match="get_checkpointer_cm"):
+            validate_liner(_NoCheckpointer())
+
+    def test_non_callable_method_raises(self) -> None:
+        """Attributes that are not callable must be treated as missing."""
+        class _BadLiner:
+            get_graph = "not_a_function"
+
+            def get_checkpointer_cm(self) -> Any:
+                return None
+
+        with pytest.raises(ValueError, match="get_graph"):
+            validate_liner(_BadLiner())
 
