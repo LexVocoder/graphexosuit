@@ -243,10 +243,23 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
                     raise ValueError(
                         f"Unknown operation: {operation!r}; expected 'run', 'resume', or 'retry'"
                     )
+
         except GraphExecutionError as graph_error:
+            # Log stack trace and error details for debugging; surface only message in execution data
+            logger.exception(
+                "GraphExecutionError in %s operation for thread %s: %s",
+                repr(operation),
+                repr(thread_id),
+                graph_error,
+                exc_info=graph_error,
+            )
             execution_error = graph_error
+
         except ThreadNotFound as thread_not_found:
             execution_error = thread_not_found
+
+        except Exception as exn:
+            logger.exception("Unexpected exception in %s operation for thread %s: %s", repr(operation), repr(thread_id), exn, exc_info=exn)
 
         # ## Append captured lines to persisted execution data (always, even on error)
         captured_stdout_lines = stdout_buffer.getvalue().splitlines()
