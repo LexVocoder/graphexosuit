@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import logging
 import threading
 import uuid
@@ -78,7 +79,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
     """
     # Validate the liner before instantiating ExosuitCore
     validate_liner(liner)
-    
+
     # ## Instantiate ExosuitCore with the Liner
     core = ExosuitCore(liner)
     
@@ -99,7 +100,11 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             namespace: The namespace prefix for all keys.
             data: Dictionary of key-value pairs to store.
         """
-        prefixed_data = {f"{namespace}.{key}": value for key, value in data.items()}
+        prefixed_data = {
+            f"{namespace}.{key}": json.dumps(value).encode("utf-8")
+            for key, value in data.items()
+        }
+
         execution_data_store.mset(list(prefixed_data.items()))
     
     def _load_dict(namespace: str, keys: list[str]) -> dict[str, Any]:
@@ -115,7 +120,10 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             Dictionary mapping each unprefixed key to its value in the store.
         """
         prefixed_keys = [f"{namespace}.{key}" for key in keys]
-        values_list = execution_data_store.mget(prefixed_keys)
+        values_list = [
+            (json.loads(b.decode("utf-8")) if b is not None else None)
+            for b in execution_data_store.mget(prefixed_keys)
+        ]
         return dict(zip(keys, values_list)) if values_list else {}
     
     def _build_poll_url(thread_id: str) -> str:
