@@ -2,15 +2,18 @@
 members = [
     "graphexosuit-core",
     "graphexosuit-layer-cli",
+    "graphexosuit-layer-backend",
 ]
 
 [tool.uv.sources]
 graphexosuit-core = { workspace = true }
 graphexosuit-layer-cli = { workspace = true }
+graphexosuit-layer-backend = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = [
     "graphexosuit-core/tests",
     "graphexosuit-layer-cli/tests",
+    "graphexosuit-layer-backend/tests",
 ]

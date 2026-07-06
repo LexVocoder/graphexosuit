@@ -16,7 +16,6 @@ from graphexosuit.core import (
     RunResult,
     StandardizedInterrupt,
     ExosuitLiner,
-    _validate_run_result,
     _validate_interrupt_value,
     InvalidInterruptError,
     GraphExecutionError,
