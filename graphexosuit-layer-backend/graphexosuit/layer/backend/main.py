@@ -218,8 +218,6 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             checkpoint_id: Required for "resume" and "retry"; the checkpoint ID.
             resume_value: Required for "resume"; the value to resume with.
         """
-        namespace = (thread_id, "__graphexosuit__")
-
         # ## Capture stdout/stderr produced during graph execution
         stdout_buffer = io.StringIO()
         stderr_buffer = io.StringIO()
@@ -265,9 +263,9 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         captured_stdout_lines = stdout_buffer.getvalue().splitlines()
         captured_stderr_lines = stderr_buffer.getvalue().splitlines()
 
-        execution_data = _get_thread_execution_data(thread_id)
-        updated_stdout_lines = (execution_data.get("stdout_lines") or []) + captured_stdout_lines
-        updated_stderr_lines = (execution_data.get("stderr_lines") or []) + captured_stderr_lines
+        current_data = _load_dict(thread_id, ["stdout_lines", "stderr_lines"])
+        updated_stdout_lines = (current_data.get("stdout_lines") or []) + captured_stdout_lines
+        updated_stderr_lines = (current_data.get("stderr_lines") or []) + captured_stderr_lines
 
         # Prepare updates dict with all fields to persist
         updates: dict[str, Any] = {
