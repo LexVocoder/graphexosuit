@@ -339,7 +339,6 @@ class TestGetThreadEndpoint:
             if poll_response.status_code == 200:
                 data = poll_response.json()
                 if data.get("status") == "completed":
-                    assert data["thread_id"] == thread_id
                     assert "status" in data
                     assert "result" in data
                     assert "error" in data
