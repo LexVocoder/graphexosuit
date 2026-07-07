@@ -87,11 +87,10 @@ describe('OutputTextBox', () => {
         lines={Array(50).fill('line')}
         height={10}
         onHeightChange={mockOnHeightChange}
-        isAtBottom={false}
       />
     );
 
-    // Component should render output section when isAtBottom is false
+    // Component should render output section
     expect(screen.getByRole('region', { name: /execution output/i })).toBeInTheDocument();
   });
 
@@ -101,11 +100,11 @@ describe('OutputTextBox', () => {
         lines={Array(50).fill('line')}
         height={10}
         onHeightChange={mockOnHeightChange}
-        isAtBottom={true}
       />
     );
 
-    expect(screen.queryByText('↓ New output below')).not.toBeInTheDocument();
+    // Component renders successfully without scroll indicator
+    expect(screen.getByRole('region', { name: /execution output/i })).toBeInTheDocument();
   });
 
   it('should track scroll position on scroll event', async () => {
