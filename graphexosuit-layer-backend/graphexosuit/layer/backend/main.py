@@ -15,8 +15,6 @@ Responsibilities:
 from __future__ import annotations
 
 import contextlib
-import io
-import json
 import logging
 import threading
 import uuid
@@ -36,6 +34,7 @@ from graphexosuit.core import (
     ThreadNotFound,
 )
 from graphexosuit.core.liner_validator import validate_liner
+from graphexosuit.layer.backend.batch_key_value_store import BatchKeyValueStore
 from graphexosuit.layer.backend.streaming_text_capture import StreamingTextCapture
 
 # ## Module-level logger
@@ -90,42 +89,8 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         description="Async REST API for LangGraph graph execution via graphexosuit.core.",
     )
     
-    # ## Helper functions for thread execution data management
-    
-    def _store_dict(namespace: str, data: dict[str, Any]) -> None:
-        """Store all key-value pairs from a dictionary in the execution_data_store.
-        
-        Prefixes each key with the namespace and a "." before storing.
-        
-        Args:
-            namespace: The namespace prefix for all keys.
-            data: Dictionary of key-value pairs to store.
-        """
-        prefixed_data = {
-            f"{namespace}.{key}": json.dumps(value).encode("utf-8")
-            for key, value in data.items()
-        }
-
-        execution_data_store.mset(list(prefixed_data.items()))
-    
-    def _load_dict(namespace: str, keys: list[str]) -> dict[str, Any]:
-        """Load a dictionary from the execution_data_store for the given keys.
-        
-        Prefixes each key with the namespace and a "." before retrieving.
-        
-        Args:
-            namespace: The namespace prefix for all keys.
-            keys: List of keys (without namespace prefix) to retrieve from the store.
-            
-        Returns:
-            Dictionary mapping each unprefixed key to its value in the store.
-        """
-        prefixed_keys = [f"{namespace}.{key}" for key in keys]
-        values_list = [
-            (json.loads(b.decode("utf-8")) if b is not None else None)
-            for b in execution_data_store.mget(prefixed_keys)
-        ]
-        return dict(zip(keys, values_list)) if values_list else {}
+    # ## Initialize the batch key-value store for thread execution data
+    execution_batch_store = BatchKeyValueStore(execution_data_store)
     
     def _build_poll_url(thread_id: str) -> str:
         """Build a poll URL from a thread ID with proper URI encoding.
@@ -151,7 +116,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         now_iso = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Try to retrieve existing created_at to check if already initialized
-        existing_data = _load_dict(thread_id, ["created_at"])
+        existing_data = execution_batch_store.get(thread_id, ["created_at"])
         if existing_data.get("created_at") is not None:
             # Already initialized; preserve the existing created_at
             return
@@ -164,7 +129,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             "error": None,
             "created_at": now_iso,
         }
-        _store_dict(thread_id, initial_data)
+        execution_batch_store.put(thread_id, initial_data)
     
     def _get_thread_execution_data(thread_id: str) -> dict[str, Any]:
         """Retrieve thread execution data for a thread.
@@ -185,7 +150,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             "error",
             "created_at",
         ]
-        loaded_data = _load_dict(thread_id, keys)
+        loaded_data = execution_batch_store.get(thread_id, keys)
         
         # If no keys were found, return empty dict
         if not loaded_data or all(v is None for v in loaded_data.values()):
@@ -220,8 +185,8 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         """
         # ## Create streaming capture objects for stdout/stderr
         # Both stdout and stderr stream to the same output_lines field for unified visibility
-        stdout_capture = StreamingTextCapture(thread_id, "output_lines", _load_dict, _store_dict)
-        stderr_capture = StreamingTextCapture(thread_id, "output_lines", _load_dict, _store_dict)
+        stdout_capture = StreamingTextCapture(thread_id, "output_lines", execution_batch_store.get, execution_batch_store.put)
+        stderr_capture = StreamingTextCapture(thread_id, "output_lines", execution_batch_store.get, execution_batch_store.put)
 
         # execution_result and execution_error are mutually exclusive outcomes
         execution_result: RunResult | None = None
@@ -288,7 +253,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             updates["result"] = asdict(execution_result)
 
         # Persist all updates as individual keys
-        _store_dict(thread_id, updates)
+        execution_batch_store.put(thread_id, updates)
     
     # ## Define the four endpoints
     
@@ -356,7 +321,6 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         return JSONResponse(
             status_code=200,
             content={
-                "thread_id": thread_id,
                 "created_at": execution_data.get("created_at"),
                 "status": execution_data.get("status"),
                 "error": execution_data.get("error"),
