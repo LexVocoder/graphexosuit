@@ -57,10 +57,10 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
     with four endpoints that manage async graph execution via background worker threads.
     All POST endpoints spawn background workers and return 202 immediately with
     thread_id and poll_url. The GET /thread/{thread_id} endpoint returns thread
-    execution data including status, result, error, and captured stdout/stderr.
+    execution data including status, result, error, and captured output (stdout/stderr combined).
 
     Thread execution data is stored in execution_data_store under namespace (thread_id, "__graphexosuit__")
-    with fields: stdout_lines, stderr_lines, status, result, error, created_at.
+    with fields: output_lines, status, result, error, created_at.
     The created_at timestamp is initialized when execution data is first created and
     is never reset.
 
@@ -158,8 +158,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         
         # Initialize new execution data with current timestamp
         initial_data = {
-            "stdout_lines": [],
-            "stderr_lines": [],
+            "output_lines": [],
             "status": "running",
             "result": None,
             "error": None,
@@ -176,12 +175,11 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             thread_id: The thread identifier to retrieve execution data for.
             
         Returns:
-            The execution data dict with keys: stdout_lines, stderr_lines, status,
+            The execution data dict with keys: output_lines, status,
             result, error, created_at. Returns empty dict if not found.
         """
         keys = [
-            "stdout_lines",
-            "stderr_lines",
+            "output_lines",
             "status",
             "result",
             "error",
@@ -221,8 +219,9 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             resume_value: Required for "resume"; the value to resume with.
         """
         # ## Create streaming capture objects for stdout/stderr
-        stdout_capture = StreamingTextCapture(thread_id, "stdout_lines", _load_dict, _store_dict)
-        stderr_capture = StreamingTextCapture(thread_id, "stderr_lines", _load_dict, _store_dict)
+        # Both stdout and stderr stream to the same output_lines field for unified visibility
+        stdout_capture = StreamingTextCapture(thread_id, "output_lines", _load_dict, _store_dict)
+        stderr_capture = StreamingTextCapture(thread_id, "output_lines", _load_dict, _store_dict)
 
         # execution_result and execution_error are mutually exclusive outcomes
         execution_result: RunResult | None = None
@@ -339,11 +338,10 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         """GET /thread/{thread_id} endpoint: Poll execution status and results.
         
         Returns execution data for the specified thread including status, result, error,
-        stdout_lines, stderr_lines, and created_at. Returns 404 if the thread
-        does not exist.
+        output_lines, and created_at. Returns 404 if the thread does not exist.
         
         Returns:
-            200 OK: {thread_id, status, result, error, stdout_lines, stderr_lines, created_at}
+            200 OK: {thread_id, status, result, error, output_lines, created_at}
             404 Not Found: If thread does not exist
         """
         execution_data = _get_thread_execution_data(thread_id)
@@ -363,8 +361,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
                 "status": execution_data.get("status"),
                 "error": execution_data.get("error"),
                 "result": execution_data.get("result"),
-                "stdout_lines": execution_data.get("stdout_lines", []),
-                "stderr_lines": execution_data.get("stderr_lines", []),
+                "output_lines": execution_data.get("output_lines", []),
             },
         )
     

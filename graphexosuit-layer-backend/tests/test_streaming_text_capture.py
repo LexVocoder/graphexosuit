@@ -34,15 +34,15 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
+        capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
         
         # Initialize store
-        mock_store_dict("thread-1", {"stdout_lines": []})
+        mock_store_dict("thread-1", {"output_lines": []})
         
         # Write complete line
         count = capture.write("hello world\n")
         assert count == 12
-        assert store_data["thread-1.stdout_lines"] == ["hello world"]
+        assert store_data["thread-1.output_lines"] == ["hello world"]
         assert capture.buf == ""
     
     def test_write_incomplete_line_buffers(self) -> None:
@@ -64,8 +64,8 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
-        mock_store_dict("thread-1", {"stdout_lines": []})
+        capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
+        mock_store_dict("thread-1", {"output_lines": []})
         call_count["store"] = 0  # Reset after init
         
         # Write incomplete line
@@ -90,12 +90,12 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
-        mock_store_dict("thread-1", {"stdout_lines": []})
+        capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
+        mock_store_dict("thread-1", {"output_lines": []})
         
         # Write with multiple newlines and incomplete line at end
         capture.write("line1\nline2\npartial")
-        assert store_data["thread-1.stdout_lines"] == ["line1", "line2"]
+        assert store_data["thread-1.output_lines"] == ["line1", "line2"]
         assert capture.buf == "partial"
     
     def test_close_flushes_remaining_buffer(self) -> None:
@@ -115,8 +115,8 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
-        mock_store_dict("thread-1", {"stdout_lines": []})
+        capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
+        mock_store_dict("thread-1", {"output_lines": []})
         
         # Write incomplete line
         capture.write("incomplete")
@@ -124,7 +124,7 @@ class TestStreamingTextCapture:
         
         # Close should flush
         capture.close()
-        assert store_data["thread-1.stdout_lines"] == ["incomplete"]
+        assert store_data["thread-1.output_lines"] == ["incomplete"]
         assert capture.buf == ""
     
     def test_close_is_idempotent(self) -> None:
@@ -144,16 +144,16 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
-        mock_store_dict("thread-1", {"stdout_lines": []})
+        capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
+        mock_store_dict("thread-1", {"output_lines": []})
         
         # Write and close twice
         capture.write("test")
         capture.close()
-        first_close_state = store_data["thread-1.stdout_lines"].copy()
+        first_close_state = store_data["thread-1.output_lines"].copy()
         
         capture.close()  # Second close
-        second_close_state = store_data["thread-1.stdout_lines"]
+        second_close_state = store_data["thread-1.output_lines"]
         
         assert first_close_state == second_close_state == ["test"]
     
@@ -174,8 +174,8 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
-        mock_store_dict("thread-1", {"stdout_lines": []})
+        capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
+        mock_store_dict("thread-1", {"output_lines": []})
         
         # Multiple writes with mixed complete/incomplete lines
         capture.write("first\n")
@@ -183,15 +183,15 @@ class TestStreamingTextCapture:
         capture.write("ond\n")
         capture.write("third")
         
-        assert store_data["thread-1.stdout_lines"] == ["first", "second"]
+        assert store_data["thread-1.output_lines"] == ["first", "second"]
         assert capture.buf == "third"
         
         # Close to flush remaining
         capture.close()
-        assert store_data["thread-1.stdout_lines"] == ["first", "second", "third"]
+        assert store_data["thread-1.output_lines"] == ["first", "second", "third"]
     
     def test_streaming_with_stderr(self) -> None:
-        """StreamingTextCapture must work independently for stderr_lines."""
+        """StreamingTextCapture must work independently for output_lines from both stdout and stderr."""
         store_data: dict[str, Any] = {}
         
         def mock_load_dict(thread_id: str, keys: list[str]) -> dict[str, Any]:
@@ -207,15 +207,14 @@ class TestStreamingTextCapture:
                 full_key = f"{thread_id}.{key}"
                 store_data[full_key] = value
         
-        stdout_capture = StreamingTextCapture("thread-1", "stdout_lines", mock_load_dict, mock_store_dict)
-        stderr_capture = StreamingTextCapture("thread-1", "stderr_lines", mock_load_dict, mock_store_dict)
+        stdout_capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
+        stderr_capture = StreamingTextCapture("thread-1", "output_lines", mock_load_dict, mock_store_dict)
         
-        mock_store_dict("thread-1", {"stdout_lines": [], "stderr_lines": []})
+        mock_store_dict("thread-1", {"output_lines": []})
         
-        # Write to both
+        # Write to both stdout and stderr, both go to output_lines
         stdout_capture.write("out1\n")
         stderr_capture.write("err1\n")
         stdout_capture.write("out2\n")
         
-        assert store_data["thread-1.stdout_lines"] == ["out1", "out2"]
-        assert store_data["thread-1.stderr_lines"] == ["err1"]
+        assert store_data["thread-1.output_lines"] == ["out1", "err1", "out2"]

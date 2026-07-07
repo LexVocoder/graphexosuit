@@ -304,6 +304,9 @@ class TestRunEndpoint:
                 poll_data = poll_response.json()
                 if poll_data.get("status") == "completed":
                     assert poll_data["result"]["final_result"]["value"] == "hello_done"
+                    # Verify output_lines exists and is a list
+                    assert "output_lines" in poll_data
+                    assert isinstance(poll_data["output_lines"], list)
                     return
             time.sleep(0.1)
         
@@ -340,8 +343,7 @@ class TestGetThreadEndpoint:
                     assert "status" in data
                     assert "result" in data
                     assert "error" in data
-                    assert "stdout_lines" in data
-                    assert "stderr_lines" in data
+                    assert "output_lines" in data
                     assert "created_at" in data
                     assert data["status"] == "completed"
                     assert data["result"] is not None
