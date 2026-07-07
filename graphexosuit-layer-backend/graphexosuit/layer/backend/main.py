@@ -36,6 +36,7 @@ from graphexosuit.core import (
     ThreadNotFound,
 )
 from graphexosuit.core.liner_validator import validate_liner
+from graphexosuit.layer.backend.streaming_text_capture import StreamingTextCapture
 
 # ## Module-level logger
 # Thread-safe by default in CPython; format includes timestamp and level for
@@ -195,6 +196,7 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         # Assemble dict from retrieved values
         return loaded_data
     
+    
     def _capture_and_run_worker(
         thread_id: str,
         operation: Literal["run", "resume", "retry"],
@@ -204,9 +206,9 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
     ) -> None:
         """Background worker function that executes a graph operation and updates execution data.
 
-        Redirects sys.stdout and sys.stderr during execution so that any text
-        printed by graph nodes is captured and appended to the thread's persisted
-        stdout_lines / stderr_lines execution data fields. On success, stores the full
+        Streams sys.stdout and sys.stderr during execution line-by-line so that any text
+        printed by graph nodes is persisted immediately to the thread's execution data,
+        providing real-time heartbeat updates to polling clients. On success, stores the full
         RunResult as a dict and sets status to "paused" (interrupt) or "completed".
         On GraphExecutionError or ThreadNotFound, stores the error dict and sets
         status to "error".
@@ -218,16 +220,16 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
             checkpoint_id: Required for "resume" and "retry"; the checkpoint ID.
             resume_value: Required for "resume"; the value to resume with.
         """
-        # ## Capture stdout/stderr produced during graph execution
-        stdout_buffer = io.StringIO()
-        stderr_buffer = io.StringIO()
+        # ## Create streaming capture objects for stdout/stderr
+        stdout_capture = StreamingTextCapture(thread_id, "stdout_lines", _load_dict, _store_dict)
+        stderr_capture = StreamingTextCapture(thread_id, "stderr_lines", _load_dict, _store_dict)
 
         # execution_result and execution_error are mutually exclusive outcomes
         execution_result: RunResult | None = None
         execution_error: GraphExecutionError | ThreadNotFound | None = None
 
         try:
-            with contextlib.redirect_stdout(stdout_buffer), contextlib.redirect_stderr(stderr_buffer):
+            with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stderr_capture):
                 if operation == "run":
                     execution_result = core.run(initial_state or {}, thread_id=thread_id)
                 elif checkpoint_id is None:
@@ -259,19 +261,12 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         except Exception as exn:
             logger.exception("Unexpected exception in %s operation for thread %s: %s", repr(operation), repr(thread_id), exn, exc_info=exn)
 
-        # ## Append captured lines to persisted execution data (always, even on error)
-        captured_stdout_lines = stdout_buffer.getvalue().splitlines()
-        captured_stderr_lines = stderr_buffer.getvalue().splitlines()
+        # ## Flush any remaining buffered output lines from the capture streams
+        stdout_capture.close()
+        stderr_capture.close()
 
-        current_data = _load_dict(thread_id, ["stdout_lines", "stderr_lines"])
-        updated_stdout_lines = (current_data.get("stdout_lines") or []) + captured_stdout_lines
-        updated_stderr_lines = (current_data.get("stderr_lines") or []) + captured_stderr_lines
-
-        # Prepare updates dict with all fields to persist
-        updates: dict[str, Any] = {
-            "stdout_lines": updated_stdout_lines,
-            "stderr_lines": updated_stderr_lines,
-        }
+        # Prepare updates dict with status and result/error information
+        updates: dict[str, Any] = {}
 
         if isinstance(execution_error, GraphExecutionError):
             updates["status"] = "error"
