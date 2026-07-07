@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+# Do not source bashrc with set -e or set -u, as it may contain commands that fail or reference unset variables, which would cause the pre-commit hook to fail unexpectedly.
+
+if [ -f "$HOME/.bashrc" ]; then
+  source "$HOME/.bashrc"
+fi
+
+# Safety on
+set -e
+
+## "import" env vars before we `set -u`
+#
+# Do not set -u before exporting environment variables, as this will cause premature failures
+
+env_pre_commit_override="$PRE_COMMIT_OVERRIDE"
+
+# Strict mode on
+set -u
+
+# Skip if PRE_COMMIT_OVERRIDE is set
+if [ "$env_pre_commit_override" = '1' ]; then
+  echo '[pre-commit] Skipped (PRE_COMMIT_OVERRIDE=1)'
+  exit 0
+fi
+
+# Install dependencies if needed
+echo '[pre-commit] Installing dependencies...'
+uv sync
+
+echo '[pre-commit] Running pre-commit checks...'
+uv run pytest
+
+printf '\n[pre-commit] All checks passed!\n'
