@@ -1,8 +1,8 @@
 curl \
-  -v \
-  -X POST \
+  --verbose \
+  --request POST \
   'http://127.0.0.1:8000/run' \
-  -H "Content-Type: application/json" \
-  -d '{}'
+  --header "Content-Type: application/json" \
+  --data '{}'
 
 echo

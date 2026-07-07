@@ -13,10 +13,10 @@ if [ -z "$thread_id" ] || [ -z "$checkpoint_id" ] || [ -z "$flavor" ]; then
 fi
 
 curl \
-  -v \
-  -X POST \
+  --verbose \
+  --request POST \
   "http://127.0.0.1:8000/thread/$thread_id/checkpoint/$checkpoint_id/resume" \
-  -H "Content-Type: application/json" \
-  -d '{"flavor":"'$flavor'"}'
+  --header "Content-Type: application/json" \
+  --data '{"flavor":"'$flavor'"}'
 
 echo
