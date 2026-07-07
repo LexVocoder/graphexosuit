@@ -1,5 +1,6 @@
 import uvicorn
 from liner import InterruptLiner
+from fastapi.staticfiles import StaticFiles
 from graphexosuit.layer.backend import create_app
 from langchain_classic.storage import LocalFileStore
 
@@ -7,6 +8,8 @@ execution_data_store = LocalFileStore(".cache/graphexosuit-samples-interrupt/exe
 
 app = create_app(InterruptLiner(), execution_data_store=execution_data_store)
 
+app.mount("/", StaticFiles(directory="/home/micro/repos/trusted/graphexosuit-webfrontend/dist", html=True), name="frontend")
+
 # Serve app
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="localhost", port=8000)
