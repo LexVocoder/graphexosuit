@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from langchain_core.stores import BaseStore
 
-from graphexosuit.core import ExosuitLiner, InterruptOption, StandardizedInterrupt
+from graphexosuit.core import InterruptOption, StandardizedInterrupt
 from graphexosuit.layer.backend import create_app
 from graphexosuit.layer.backend.transformers import transform_run_result, build_resume_url
 from graphexosuit.layer.backend.error_responses import build_retry_url, error_response_500
@@ -109,34 +109,16 @@ def _get_checkpointer() -> Any:
     return _shared_checkpointer
 
 
-class _TestLiner(ExosuitLiner):
-    """Minimal ExosuitLiner for use in tests."""
-
-    def get_graph(self) -> Any:
-        return _get_graph()
-
-    def get_checkpointer_cm(self) -> Any:
-        return _CheckpointerCM(_get_checkpointer())
-
-
 def _make_client() -> TestClient:
     """Create a fresh TestClient backed by a new async app with in-memory execution data store."""
     execution_data_store = _InMemoryExecutionDataStore()
-    app = create_app(_TestLiner(), execution_data_store)
+    app = create_app(
+        graph=_get_graph(),
+        checkpointer_cm=_CheckpointerCM(_get_checkpointer()),
+        execution_data_store=execution_data_store,
+    )
     return TestClient(app, raise_server_exceptions=False)
 
-
-
-# ===========================================================================
-# Unit tests: create_app
-# ===========================================================================
-
-class TestCreateApp:
-    def test_create_app_raises_on_invalid_liner(self) -> None:
-        """create_app must propagate liner validation error at construction time."""
-        store = _InMemoryExecutionDataStore()
-        with pytest.raises(ValueError):
-            create_app(None, store)  # type: ignore[arg-type]
 
 
 # ===========================================================================

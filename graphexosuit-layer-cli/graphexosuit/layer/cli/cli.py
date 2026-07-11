@@ -12,7 +12,7 @@ from dataclasses import asdict
 from shlex import quote
 from typing import Any, Callable, Optional
 
-from graphexosuit.core import ExosuitCore, ExosuitLiner, RunResult, GraphExecutionError
+from graphexosuit.core import ExosuitCore, RunResult, GraphExecutionError
 
 
 def _get_quoted_program_name() -> str:
@@ -68,15 +68,16 @@ def _to_cli_args(thread_id: str, checkpoint_id: Optional[str]) -> str:
 
 
 class CliApp:
-    """CLI application for graphexosuit; clients must inject a Liner instance."""
+    """CLI application for graphexosuit; clients must inject a graph and checkpointer context manager."""
 
-    def __init__(self, liner: ExosuitLiner) -> None:
-        """Initialize CLI with a custom liner instance.
+    def __init__(self, *, graph: Any, checkpointer_cm: Any) -> None:
+        """Initialize CLI with a graph and checkpointer context manager.
 
         Args:
-            liner: An ExosuitLiner instance to use for graph execution.
+            graph: A compiled or uncompiled LangGraph StateGraph.
+            checkpointer_cm: A context manager that yields a checkpointer instance.
         """
-        self.core = ExosuitCore(liner)
+        self.core = ExosuitCore(graph=graph, checkpointer_cm=checkpointer_cm)
         self.app = typer.Typer(
             name="graphexosuit",
             help="Execute, resume, and retry LangGraph workflows.",

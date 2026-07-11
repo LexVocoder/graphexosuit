@@ -33,7 +33,6 @@ from graphexosuit.core import (
     RunResult,
     ThreadNotFound,
 )
-from graphexosuit.core.liner_validator import validate_liner
 from graphexosuit.layer.backend.batch_key_value_store import BatchKeyValueStore
 from graphexosuit.layer.backend.streaming_text_capture import StreamingTextCapture
 
@@ -49,14 +48,15 @@ logger = logging.getLogger(__name__)
 
 
 
-def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
+def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseStore) -> FastAPI:
     """Create and return a FastAPI application for graphexosuit-layer-restservice.
 
-    Instantiates ExosuitCore with the provided Liner and creates a FastAPI app
-    with four endpoints that manage async graph execution via background worker threads.
-    All POST endpoints spawn background workers and return 202 immediately with
-    thread_id and poll_url. The GET /thread/{thread_id} endpoint returns thread
-    execution data including status, result, error, and captured output (stdout/stderr combined).
+    Instantiates ExosuitCore with the provided graph and checkpointer context manager,
+    then creates a FastAPI app with four endpoints that manage async graph execution
+    via background worker threads.  All POST endpoints spawn background workers and
+    return 202 immediately with thread_id and poll_url.  The GET /thread/{thread_id}
+    endpoint returns thread execution data including status, result, error, and captured
+    output (stdout/stderr combined).
 
     Thread execution data is stored in execution_data_store under namespace (thread_id, "__graphexosuit__")
     with fields: output_lines, status, result, error, created_at.
@@ -64,7 +64,8 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
     is never reset.
 
     Args:
-        liner: A Liner instance providing get_graph() and get_checkpointer_cm().
+        graph: A compiled or uncompiled LangGraph StateGraph.
+        checkpointer_cm: A context manager that yields a checkpointer instance.
         execution_data_store: A langchain_core.stores.BaseStore for persisting thread execution data.
 
     Returns:
@@ -73,15 +74,9 @@ def create_app(liner: Any, execution_data_store: BaseStore) -> FastAPI:
         - GET /thread/{thread_id}: Poll execution status and results
         - POST /thread/{thread_id}/checkpoint/{checkpoint_id}/resume: Resume paused execution
         - POST /thread/{thread_id}/checkpoint/{checkpoint_id}/retry: Retry failed execution
-
-    Raises:
-        ValueError: If *liner* is None or missing required interface methods.
     """
-    # Validate the liner before instantiating ExosuitCore
-    validate_liner(liner)
-
-    # ## Instantiate ExosuitCore with the Liner
-    core = ExosuitCore(liner)
+    # ## Instantiate ExosuitCore with the graph and checkpointer
+    core = ExosuitCore(graph=graph, checkpointer_cm=checkpointer_cm)
     
     # ## Create FastAPI app
     fastapi_app = FastAPI(

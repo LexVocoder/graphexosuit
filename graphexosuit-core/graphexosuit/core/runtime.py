@@ -110,21 +110,20 @@ def _extract_checkpoint_id(graph: Any, config: RunnableConfig) -> str:
 class ExosuitCore:
     """Thin runtime wrapper around a LangGraph workflow.
 
-    The constructor accepts a Liner-compatible instance that exposes
-    ``get_graph()`` and ``get_checkpointer_cm()`` methods.
-
     Parameters
     ----------
-    liner:
-        A Liner-compatible instance that provides ``get_graph()`` and
-        ``get_checkpointer_cm()`` methods.
+    graph:
+        A compiled or uncompiled LangGraph ``StateGraph``.  If a raw
+        ``StateGraph`` is provided it is compiled automatically using
+        *checkpointer*.
+    checkpointer_cm:
+        A context manager whose ``__enter__`` yields a
+        ``BaseCheckpointSaver``.  The context is entered on construction
+        and exited in ``__del__``.
     """
-    def __init__(self, liner: Any) -> None:
-        self._liner = liner
-        graph = liner.get_graph()
-        
+    def __init__(self, *, graph: Any, checkpointer_cm: Any) -> None:
         # Enter the checkpointer context manager and store it for cleanup in __del__
-        self._checkpointer_cm = liner.get_checkpointer_cm()
+        self._checkpointer_cm = checkpointer_cm
         checkpointer = self._checkpointer_cm.__enter__()
 
         if isinstance(graph, StateGraph):
@@ -157,19 +156,13 @@ class ExosuitCore:
             interrupt_value: Optional[StandardizedInterrupt] = None,
             final_result: Optional[dict] = None,
     ) -> RunResult:
-        """Helper to construct a RunResult with optional transformation & validation."""
-        run_result = RunResult(
+        """Helper to construct and return a RunResult."""
+        return RunResult(
             thread_id=thread_id,
             checkpoint_id=checkpoint_id,
             interrupt_value=interrupt_value,
             final_result=final_result,
         )
-
-        if hasattr(self._liner, "transform_run_result"):
-            run_result = self._liner.transform_run_result(run_result)
-
-        _validate_run_result(run_result)
-        return run_result
 
     def _invoke(self,
                 initial_state: Any,
@@ -239,10 +232,6 @@ class ExosuitCore:
         if thread_id is None:
             thread_id = str(uuid.uuid4())
         config = cast(RunnableConfig, {"configurable": {"thread_id": thread_id}})
-
-        if hasattr(self._liner, "transform_initial_state"):
-            initial_state = self._liner.transform_initial_state(initial_state)
-
         return self._invoke(initial_state, config)
 
     def resume(
@@ -263,9 +252,6 @@ class ExosuitCore:
             The payload to send back to the paused node (typically a dict).
         """
 
-        if hasattr(self._liner, "transform_resume_value"):
-            resume_value = self._liner.transform_resume_value(resume_value)
-
         config = cast(RunnableConfig, {
             "configurable": {
                 "thread_id": thread_id,
@@ -285,23 +271,11 @@ class ExosuitCore:
             Checkpoint at which the failure occurred.
         """
 
-        if hasattr(self._liner, "on_retry"):
-            try:
-                self._liner.on_retry(thread_id=thread_id, checkpoint_id=checkpoint_id)
-            except Exception as exc:
-                raise GraphExecutionError(
-                    message="Error in liner's on_retry hook",
-                    original_exception=exc,
-                    thread_id=thread_id,
-                    checkpoint_id=checkpoint_id,
-                ) from exc
-
         config = cast(RunnableConfig, {
             "configurable": {
                 "thread_id": thread_id,
                 "checkpoint_id": checkpoint_id,
             }
         })
-
         # None is a magic value meaning "resume from last checkpoint"
         return self._invoke(None, config)

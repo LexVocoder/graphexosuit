@@ -2,7 +2,7 @@
 
 # # interrupt.py
 
-"""Graph that demonstrates a node that calls interrupt(), wrapped in a command-line interface that allows for resuming after the interrupt."""
+"""Graph factory and checkpointer factory for the interrupt sample."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import StateGraph
 from langgraph.types import interrupt
 
-from graphexosuit.core import ExosuitLiner, InterruptOption, StandardizedInterrupt
+from graphexosuit.core import InterruptOption, StandardizedInterrupt
 
 # Graph nodes
 
@@ -50,30 +50,29 @@ class SimpleState(TypedDict):
     value: Any
 
 
-class InterruptLiner(ExosuitLiner):
-    def __init__(self):
-        pass
+def get_checkpointer_cm() -> Any:
+    """Return a context manager that yields a SqliteSaver checkpointer."""
+    # Cross-platform parent of the .cache directory
+    cache_dir = os.path.join(
+        os.getenv("LOCALAPPDATA", os.path.expanduser("~")),
+        ".cache",
+        "graphexosuit-samples-interrupt",
+    )
+    os.makedirs(cache_dir, exist_ok=True)
 
-    def get_checkpointer_cm(self) -> Any:
-        # Cross-platform parent of the .cache directory
-        cache_dir = os.path.join(
-            os.getenv("LOCALAPPDATA", os.path.expanduser("~")),
-            ".cache",
-            "graphexosuit-samples-interrupt",
-        )
-        os.makedirs(cache_dir, exist_ok=True)
+    path_to_db = os.path.join(cache_dir, "checkpoints.db")
 
-        path_to_db = os.path.join(cache_dir, "checkpoints.db")
+    return SqliteSaver.from_conn_string(path_to_db)
 
-        return SqliteSaver.from_conn_string(path_to_db)
 
-    def get_graph(self) -> StateGraph:
-        builder = StateGraph(SimpleState)
-        builder.add_node("initialize", initialize)
-        builder.add_node("node", node)
+def build_graph() -> StateGraph:
+    """Return an uncompiled StateGraph for the interrupt sample."""
+    builder = StateGraph(SimpleState)
+    builder.add_node("initialize", initialize)
+    builder.add_node("node", node)
 
-        builder.set_entry_point("initialize")
-        builder.add_edge("initialize", "node")
-        builder.set_finish_point("node")
-        return builder
+    builder.set_entry_point("initialize")
+    builder.add_edge("initialize", "node")
+    builder.set_finish_point("node")
+    return builder
 

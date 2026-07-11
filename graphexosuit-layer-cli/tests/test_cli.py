@@ -5,12 +5,11 @@ from __future__ import annotations
 import io
 import json
 import sys
-import types as _types
 from typing import Any, TypedDict
 
 from typer.testing import CliRunner
 
-from graphexosuit.core import ExosuitLiner, GraphExecutionError
+from graphexosuit.core import GraphExecutionError
 from graphexosuit.layer.cli import CliApp
 
 
@@ -79,23 +78,6 @@ def _get_checkpointer():
     return _shared_checkpointer
 
 
-class _TestLiner(ExosuitLiner):
-    """Liner-compatible class for testing."""
-
-    def get_graph(self) -> Any:
-        return _get_graph()
-
-    def get_checkpointer_cm(self) -> Any:
-        return _CheckpointerContextManager(_get_checkpointer())
-
-
-# Register fake module on sys.modules so graph_loader can import it
-_FAKE_MODULE = "fake_graph_module"
-_fake_mod = _types.ModuleType(_FAKE_MODULE)
-setattr(_fake_mod, "_TestLiner", _TestLiner)
-sys.modules[_FAKE_MODULE] = _fake_mod
-
-
 # Use mix_stderr=False so that stderr (tracebacks) don't pollute stdout JSON
 runner = CliRunner()
 
@@ -108,8 +90,8 @@ def _parse_json(output: str) -> dict:
 
 
 def _get_cli():
-    """Create a CliApp instance with a test liner."""
-    return CliApp(_TestLiner())
+    """Create a CliApp instance with a test graph and checkpointer."""
+    return CliApp(graph=_get_graph(), checkpointer_cm=_CheckpointerContextManager(_get_checkpointer()))
 
 
 # ---------------------------------------------------------------------------

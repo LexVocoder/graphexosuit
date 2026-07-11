@@ -111,32 +111,28 @@ class _CheckpointerContextManager:
 
 # Helper to create a TestLiner that properly compiles graphs
 def _make_core(uncompiled_graph_thunk, precompile=True) -> ExosuitCore:
-    """Create ExosuitCore with a TestLiner.
+    """Create ExosuitCore with a graph and checkpointer.
     
     Parameters
     ----------
     uncompiled_graph_thunk:
         Callable that returns a StateGraph.
     precompile:
-        If True, get_graph() returns a pre-compiled graph.
-        If False, get_graph() returns the raw StateGraph (for testing that ExosuitCore compiles it automatically).
+        If True, the graph is compiled before being passed to ExosuitCore.
+        If False, the raw StateGraph is passed (for testing that ExosuitCore compiles it automatically).
     """
     checkpointer = MemorySaver()
-    
-    class TestLiner:
-        def get_graph(self) -> Any:
-            graph = uncompiled_graph_thunk()
-            if precompile:
-                # Return pre-compiled graph
-                return graph.compile(checkpointer=checkpointer)
-            else:
-                # Return raw StateGraph (ExosuitCore will compile it)
-                return graph
-
-        def get_checkpointer_cm(self) -> Any:
-            return _CheckpointerContextManager(checkpointer)
-
-    return ExosuitCore(TestLiner())
+    graph = uncompiled_graph_thunk()
+    if precompile:
+        return ExosuitCore(
+            graph=graph.compile(checkpointer=checkpointer),
+            checkpointer_cm=_CheckpointerContextManager(checkpointer),
+        )
+    else:
+        return ExosuitCore(
+            graph=graph,
+            checkpointer_cm=_CheckpointerContextManager(checkpointer),
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -264,8 +260,8 @@ class TestExosuitCoreRun:
         # The original error is a serialization error from msgpack
         assert "Type is not msgpack serializable" in str(error.__cause__)
 
-    def test_run_without_transform_initial_state_passes_unchanged(self):
-        """When liner has no transform_initial_state, initial_state is passed to _invoke unchanged."""
+    def test_run_passes_initial_state_to_invoke_unchanged(self):
+        """initial_state is forwarded to _invoke without modification."""
         core = _make_core(_simple_graph)
         
         # Mock _invoke to capture what it receives
@@ -279,41 +275,10 @@ class TestExosuitCoreRun:
         
         core._invoke = mock_invoke
         
-        # Verify transform_initial_state does not exist
-        assert not hasattr(core._liner, "transform_initial_state")
-        
         input_state = {"value": "test"}
         result = core.run(input_state)
         
-        # Verify the initial_state passed to _invoke is the same as input
         assert captured_args["initial_state"] == input_state
-
-    def test_run_with_transform_initial_state_calls_and_passes_transformed(self):
-        """When liner has transform_initial_state, it gets called and result is passed to _invoke."""
-        core = _make_core(_simple_graph)
-        
-        # Add transform_initial_state method to liner
-        def transform_fn(state):
-            return {"value": state["value"] + "_transformed"}
-        
-        core._liner.transform_initial_state = transform_fn
-        
-        # Mock _invoke to capture what it receives
-        original_invoke = core._invoke
-        captured_args = {}
-        
-        def mock_invoke(initial_state, config):
-            captured_args["initial_state"] = initial_state
-            captured_args["config"] = config
-            return original_invoke(initial_state, config)
-        
-        core._invoke = mock_invoke
-        
-        input_state = {"value": "test"}
-        result = core.run(input_state)
-        
-        # Verify the initial_state passed to _invoke is the transformed version
-        assert captured_args["initial_state"] == {"value": "test_transformed"}
 
 
 # ---------------------------------------------------------------------------
@@ -341,8 +306,8 @@ class TestExosuitCoreResume:
         result = core.resume(run_result.thread_id, run_result.checkpoint_id, {"key": "value"})
         assert result.final_result is not None
 
-    def test_resume_without_transform_passes_original_to_invoke(self):
-        """When liner has no transform_resume_value, original resume_value is passed in Command to _invoke."""
+    def test_resume_passes_resume_value_as_command_to_invoke(self):
+        """resume_value is wrapped in a Command and forwarded to _invoke unchanged."""
         core, run_result = self._paused_core()
         assert run_result.checkpoint_id is not None
         
@@ -356,9 +321,6 @@ class TestExosuitCoreResume:
             return original_invoke(initial_state, config)
         
         core._invoke = mock_invoke
-        
-        # Verify transform_resume_value does not exist
-        assert not hasattr(core._liner, "transform_resume_value")
         
         resume_value = {"key": "value"}
         result = core.resume(run_result.thread_id, run_result.checkpoint_id, resume_value)
@@ -366,35 +328,6 @@ class TestExosuitCoreResume:
         # Verify the initial_state passed to _invoke is a Command with the original resume_value
         assert isinstance(captured_args["initial_state"], Command)
         assert captured_args["initial_state"].resume == resume_value
-
-    def test_resume_with_transform_passes_transformed_to_invoke(self):
-        """When liner has transform_resume_value, transformed resume_value is passed in Command to _invoke."""
-        core, run_result = self._paused_core()
-        assert run_result.checkpoint_id is not None
-        
-        # Add transform_resume_value to liner
-        def transform_fn(rv):
-            return {"transformed": True, "original": rv}
-        
-        core._liner.transform_resume_value = transform_fn
-        
-        # Mock _invoke to capture what it receives
-        original_invoke = core._invoke
-        captured_args = {}
-        
-        def mock_invoke(initial_state, config):
-            captured_args["initial_state"] = initial_state
-            captured_args["config"] = config
-            return original_invoke(initial_state, config)
-        
-        core._invoke = mock_invoke
-        
-        resume_value = {"approval": "granted"}
-        result = core.resume(run_result.thread_id, run_result.checkpoint_id, resume_value)
-        
-        # Verify the initial_state passed to _invoke is a Command with the transformed resume_value
-        assert isinstance(captured_args["initial_state"], Command)
-        assert captured_args["initial_state"].resume == {"transformed": True, "original": resume_value}
 
 
 # ---------------------------------------------------------------------------
@@ -416,62 +349,6 @@ class TestExosuitCoreRetry:
         result = core.retry(err.get_thread_id(), checkpoint_id)
         assert result.final_result is not None
         assert result.final_result == {"value": "recovered"}
-
-    def test_retry_calls_on_retry_hook(self):
-        """When liner has on_retry method, retry calls it."""
-        core = _make_core(_error_graph)
-        
-        # Add on_retry method to liner
-        on_retry_called = {}
-        
-        def on_retry_fn(thread_id, checkpoint_id):
-            on_retry_called["called"] = True
-            on_retry_called["thread_id"] = thread_id
-            on_retry_called["checkpoint_id"] = checkpoint_id
-        
-        core._liner.on_retry = on_retry_fn
-        
-        # First call: error
-        with pytest.raises(GraphExecutionError) as exc_info:
-            core.run({"value": "start"}, thread_id="t-hook")
-        
-        err = exc_info.value
-        checkpoint_id = err.get_checkpoint_id()
-        
-        # Retry
-        result = core.retry(err.get_thread_id(), checkpoint_id)
-        
-        # Verify on_retry was called
-        assert on_retry_called["called"]
-        assert on_retry_called["thread_id"] == err.get_thread_id()
-        assert on_retry_called["checkpoint_id"] == checkpoint_id
-
-    def test_retry_on_retry_hook_throws_raises_error(self):
-        """When on_retry hook throws, retry() raises GraphExecutionError."""
-        core = _make_core(_error_graph)
-        
-        # Add on_retry method that throws
-        def bad_on_retry_fn(thread_id, checkpoint_id):
-            raise RuntimeError("on_retry failed")
-        
-        core._liner.on_retry = bad_on_retry_fn
-        
-        # First call: error
-        with pytest.raises(GraphExecutionError) as exc_info:
-            core.run({"value": "start"}, thread_id="t-hook-error")
-        
-        err = exc_info.value
-        checkpoint_id = err.get_checkpoint_id()
-        
-        # Retry - should raise GraphExecutionError because on_retry hook threw
-        with pytest.raises(GraphExecutionError) as retry_exc_info:
-            core.retry(err.get_thread_id(), checkpoint_id)
-        
-        # Verify the error is about on_retry
-        retry_err = retry_exc_info.value
-        assert "on_retry" in str(retry_err)
-        assert isinstance(retry_err.__cause__, RuntimeError)
-        assert "on_retry failed" in str(retry_err.__cause__)
 
     def test_retry_graph_executes_again_and_recovers(self):
         """When retry is called, graph executes again and can recover from errors."""
@@ -497,36 +374,17 @@ class TestExosuitCoreRetry:
 # ---------------------------------------------------------------------------
 
 class TestExosuitCoreBuildRunResult:
-    def test_build_run_result_with_transform(self):
-        """Test _build_run_result when liner has transform_run_result method."""
+    def test_build_run_result_returns_correct_values(self):
+        """Test _build_run_result constructs and returns the expected RunResult."""
         core = _make_core(_simple_graph)
-
-        # Mock transform_run_result to modify the result
-        def transform_fn(result):
-            result.final_result = {"modified": True}
-            return result
-
-        core._liner.transform_run_result = transform_fn
-
-        result = core._build_run_result(
-            thread_id="t1", final_result={"original": True}
-        )
-
-        assert result.final_result == {"modified": True}
-
-    def test_build_run_result_without_transform(self):
-        """Test _build_run_result when liner doesn't have transform_run_result."""
-        core = _make_core(_simple_graph)
-
-        # Ensure transform_run_result doesn't exist
-        assert not hasattr(core._liner, "transform_run_result")
 
         result = core._build_run_result(
             thread_id="t1", final_result={"value": "test"}
         )
 
-        # Result should pass through without modification
         assert result.final_result == {"value": "test"}
+        assert result.thread_id == "t1"
+        assert result.interrupt_value is None
 
 
 # ---------------------------------------------------------------------------
@@ -535,63 +393,36 @@ class TestExosuitCoreBuildRunResult:
 
 class TestExosuitCoreCompile:
     def test_accepts_precompiled_graph(self):
-        """ExosuitCore must accept a Liner instance with a pre-compiled graph."""
-        # Create a StateGraph and compile it with a checkpointer
-        graph = _simple_graph()
+        """ExosuitCore must accept a pre-compiled graph."""
         checkpointer = MemorySaver()
-        compiled = graph.compile(checkpointer=checkpointer)
+        compiled = _simple_graph().compile(checkpointer=checkpointer)
 
-        # Compiled graph should not be a StateGraph
-        from langgraph.graph.state import StateGraph as LangGraphStateGraph
-        assert not isinstance(compiled, LangGraphStateGraph)
-
-        class TestLiner(ExosuitLiner):
-            def get_graph(self) -> Any:
-                return compiled
-
-            def get_checkpointer_cm(self) -> Any:
-                return _CheckpointerContextManager(checkpointer)
-
-        core = ExosuitCore(TestLiner())
+        core = ExosuitCore(
+            graph=compiled,
+            checkpointer_cm=_CheckpointerContextManager(checkpointer),
+        )
         result = core.run({"value": "test"})
         assert result.final_result is not None
         assert result.final_result == {"value": "test_done"}
 
     def test_accepts_uncompiled_state_graph(self):
-        """ExosuitCore accepts and compiles an uncompiled StateGraph from get_graph."""
-        # Return an uncompiled StateGraph (not calling .compile())
-        uncompiled = _simple_graph()
-
+        """ExosuitCore accepts and compiles an uncompiled StateGraph."""
         checkpointer = MemorySaver()
-
-        class TestLiner(ExosuitLiner):
-            def get_graph(self) -> Any:
-                return uncompiled
-
-            def get_checkpointer_cm(self) -> Any:
-                return _CheckpointerContextManager(checkpointer)
-
-        # Should not raise; ExosuitCore should compile it for us
-        core = ExosuitCore(TestLiner())
+        core = ExosuitCore(
+            graph=_simple_graph(),
+            checkpointer_cm=_CheckpointerContextManager(checkpointer),
+        )
         result = core.run({"value": "test"})
         assert result.final_result is not None
         assert result.final_result == {"value": "test_done"}
 
     def test_uncompiled_state_graph_compiles_with_correct_checkpointer(self):
         """ExosuitCore compiles uncompiled StateGraph using the correct checkpointer."""
-        uncompiled = _simple_graph()
         checkpointer = MemorySaver()
-
-        class TestLiner(ExosuitLiner):
-            def get_graph(self) -> Any:
-                return uncompiled
-
-            def get_checkpointer_cm(self) -> Any:
-                return _CheckpointerContextManager(checkpointer)
-
-        core = ExosuitCore(TestLiner())
-        # Run and pause to verify checkpointer is set up correctly
-        core_with_interrupt = _make_core(_interrupt_graph, precompile=False)
+        core_with_interrupt = ExosuitCore(
+            graph=_interrupt_graph(),
+            checkpointer_cm=_CheckpointerContextManager(checkpointer),
+        )
         result = core_with_interrupt.run({"value": "start"}, thread_id="t1")
         
         # Should pause with a checkpoint
