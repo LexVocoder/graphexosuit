@@ -20,17 +20,12 @@ Thin runtime wrapper around a LangGraph workflow that enables execution, pausing
 #### Constructor
 
 ```python
-ExosuitCore(liner: Any)
+ExosuitCore(*, graph: Any, checkpointer_cm: Any)
 ```
 
 **Parameters:**
-- `liner` – A Liner-compatible instance that provides:
-  - `get_graph() -> StateGraph | CompiledStateGraph` – Returns the workflow graph
-  - `get_checkpointer_cm() -> Iterator[BaseCheckpointSaver]` – Returns a context manager for checkpoint persistence
-  - Optional: `transform_initial_state(dict) -> dict` – Transform initial state before execution
-  - Optional: `transform_resume_value(Any) -> Any` – Transform resume values before resuming
-  - Optional: `transform_run_result(RunResult) -> RunResult` – Transform run results
-  - Optional: `on_retry(thread_id: str, checkpoint_id: str) -> None` – Hook called before retry
+- `graph` – A LangGraph `StateGraph` or compiled `CompiledStateGraph` representing the workflow
+- `checkpointer_cm` – A context manager that yields a `BaseCheckpointSaver` for checkpoint persistence
 
 **Raises:**
 - `ValueError` – If checkpointer setup fails
@@ -38,15 +33,21 @@ ExosuitCore(liner: Any)
 **Example:**
 
 ```python
-from graphexosuit.core import ExosuitCore, ExosuitLiner
+from graphexosuit.core import ExosuitCore
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph
 
-class MyWorkflow(ExosuitLiner):
-    def get_graph(self) -> StateGraph:
-        graph = StateGraph({"value": int})
-        # ... define graph nodes and edges
-        return graph
+graph = StateGraph({"value": int})
+# ... define graph nodes and edges
+compiled_graph = graph.compile(checkpointer=MemorySaver())
+
+class CheckpointerContextManager:
+    def __enter__(self):
+        return MemorySaver()
+    def __exit__(self, *args):
+        pass
+
+core = ExosuitCore(graph=compiled_graph, checkpointer_cm=CheckpointerContextManager())
     
     def get_checkpointer_cm(self):
         checkpointer = MemorySaver()
@@ -125,7 +126,7 @@ Retry a failed graph node from its last checkpoint.
 - `RunResult` – The next execution outcome.
 
 **Raises:**
-- `GraphExecutionError` – If the graph raises an exception again, or if the liner's `on_retry()` hook fails.
+- `GraphExecutionError` – If the graph raises an exception again during the retry.
 
 **Example:**
 
@@ -245,157 +246,6 @@ else:
 
 ---
 
-## Abstract Base Classes
-
-### `ExosuitLiner`
-
-Abstract base class defining the interface between `ExosuitCore` and a LangGraph workflow.
-
-Implementers must provide a compiled or uncompiled LangGraph state graph and a checkpoint saver context manager.
-
-```python
-from abc import ABC, abstractmethod
-from graphexosuit.core import ExosuitLiner
-from langgraph.graph import StateGraph
-from langgraph.checkpoint.base import BaseCheckpointSaver
-from typing import Iterator
-
-class MyLiner(ExosuitLiner):
-    def get_graph(self) -> StateGraph:
-        # Required: return your LangGraph StateGraph
-        pass
-    
-    def get_checkpointer_cm(self) -> Iterator[BaseCheckpointSaver]:
-        # Required: yield a BaseCheckpointSaver
-        pass
-```
-
-#### Abstract Methods
-
-##### `get_graph() -> StateGraph | CompiledStateGraph`
-
-Return the LangGraph workflow graph.
-
-**Returns:**
-- A `StateGraph` or `CompiledStateGraph` instance. If `StateGraph`, `ExosuitCore` compiles it automatically.
-
-**Example:**
-
-```python
-def get_graph(self) -> StateGraph:
-    graph = StateGraph({"messages": list, "count": int})
-    graph.add_node("process", self.process_node)
-    graph.add_node("decide", self.decide_node)
-    graph.add_edge("process", "decide")
-    graph.set_entry_point("process")
-    graph.set_finish_point("decide")
-    return graph
-```
-
-##### `get_checkpointer_cm() -> Iterator[BaseCheckpointSaver]`
-
-Yield a checkpoint saver instance as a context manager.
-
-**Yields:**
-- A `BaseCheckpointSaver` instance (e.g., `MemorySaver`, `SqliteSaver`, custom saver).
-
-**Example:**
-
-```python
-from contextlib import contextmanager
-from langgraph.checkpoint.sqlite import SqliteSaver
-
-@contextmanager
-def get_checkpointer_cm(self) -> Iterator[BaseCheckpointSaver]:
-    return SqliteSaver.from_conn_string(":memory:")
-```
-
-#### Optional Hook Methods
-
-##### `on_retry(thread_id: str, checkpoint_id: str) -> None`
-
-Called before `retry()` resumes from a checkpoint. Override to perform side effects like logging or cleanup.
-
-**Parameters:**
-- `thread_id` – Thread identifier of the retry.
-- `checkpoint_id` – Checkpoint being retried.
-
-**Raises:**
-- Any exception raised is wrapped in `GraphExecutionError`.
-
-**Example:**
-
-```python
-def on_retry(self, thread_id: str, checkpoint_id: str) -> None:
-    logger.info(f"Retrying thread {thread_id} from checkpoint {checkpoint_id}")
-```
-
-#### Optional Transformation Methods
-
-##### `transform_initial_state(initial_state: dict) -> dict`
-
-Transform the initial state dict before passing to the graph in `run()`.
-
-**Parameters:**
-- `initial_state` – The state dict provided to `run()`.
-
-**Returns:**
-- Transformed state dict.
-
-**Default:** Returns `initial_state` unchanged.
-
-**Example:**
-
-```python
-def transform_initial_state(self, initial_state: dict) -> dict:
-    # Add computed fields or validation
-    initial_state["timestamp"] = time.time()
-    return initial_state
-```
-
-##### `transform_resume_value(resume_value: Any) -> Any`
-
-Transform the resume value before passing to the graph in `resume()`.
-
-**Parameters:**
-- `resume_value` – The value provided to `resume()`.
-
-**Returns:**
-- Transformed value.
-
-**Default:** Returns `resume_value` unchanged.
-
-**Example:**
-
-```python
-def transform_resume_value(self, resume_value: Any) -> Any:
-    # Validate or normalize the resume value
-    if isinstance(resume_value, dict):
-        resume_value["timestamp"] = time.time()
-    return resume_value
-```
-
-##### `transform_run_result(result: RunResult) -> RunResult`
-
-Transform the `RunResult` before returning from `run()`, `resume()`, or `retry()`.
-
-**Parameters:**
-- `result` – The `RunResult` produced by graph execution.
-
-**Returns:**
-- Transformed `RunResult`.
-
-**Default:** Returns `result` unchanged.
-
-**Example:**
-
-```python
-def transform_run_result(self, result: RunResult) -> RunResult:
-    # Add metadata or filter sensitive fields
-    return result
-```
-
----
 
 ## Exceptions
 

@@ -104,5 +104,5 @@ def transform_run_result(result: RunResult) -> dict:
     raise ValueError(
         f"RunResult for thread_id={result.thread_id!r} has neither "
         "interrupt_value nor final_result set. "
-        "This indicates a programming error in the graph or the Liner."
+        "This indicates a programming error in the graph or the ExosuitCore implementation."
     )

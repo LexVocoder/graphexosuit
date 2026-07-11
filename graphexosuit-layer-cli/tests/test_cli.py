@@ -14,7 +14,7 @@ from graphexosuit.layer.cli import CliApp
 
 
 # ---------------------------------------------------------------------------
-# Fixture: minimal in-process graph module with Liner-compatible class
+# Fixture: minimal in-process graph and checkpointer for testing
 # ---------------------------------------------------------------------------
 # The checkpointer is a module-level singleton so that state is preserved
 # across multiple CLI invocations within the same test.

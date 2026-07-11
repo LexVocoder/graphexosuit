@@ -26,13 +26,13 @@ uv run pytest tests/ -v
 
 ## Quick start
 
-### 1. Create your graph module
+### 1. Create and compile your graph
 
 ```python
 # my_project/workflows.py
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.sqlite import SqliteSaver
-from graphexosuit.core import StandardizedInterrupt, InterruptOption, ExosuitLiner
+from graphexosuit.core import StandardizedInterrupt, InterruptOption
 from langgraph.types import interrupt
 from typing import TypedDict
 
@@ -44,37 +44,38 @@ def approval_node(state):
     response = interrupt(StandardizedInterrupt(
         message="Approve this action?",
         options=[
-            InterruptOption(payload=, label="Approve", payload=APPROVE_PAYLOAD),
-            InterruptOption(payload="", label="Reject",  payload="n💧pe"),
+            InterruptOption(label="Approve", payload=APPROVE_PAYLOAD),
+            InterruptOption(label="Reject",  payload="reject"),
         ]
     ))
     if response == APPROVE_PAYLOAD:
         return {"value": "approved"}
     return {"value": "rejected"}
 
-class MyWorkflow(ExosuitLiner):
-    def __init__(self):
-        pass
-
-    def get_graph(self):
-        """Return a StateGraph or a compiled StateGraph."""
-        builder = StateGraph(State)
-        builder.add_node("approval", approval_node)
-        builder.set_entry_point("approval")
-        builder.set_finish_point("approval")
-        return builder
-
-    def get_checkpointer_cm(self):
-        return SqliteSaver.from_conn_string(...)
+def build_graph():
+    """Return a compiled StateGraph."""
+    builder = StateGraph(State)
+    builder.add_node("approval", approval_node)
+    builder.set_entry_point("approval")
+    builder.set_finish_point("approval")
+    return builder.compile(checkpointer=SqliteSaver.from_conn_string(...))
+```
 ```
 
 ### 2. Use ExosuitCore directly
 
 ```python
 from graphexosuit.core import ExosuitCore
-from my_project.workflows import MyWorkflow
+from my_project.workflows import build_graph
+from contextlib import contextmanager
 
-core = ExosuitCore(MyWorkflow())
+# Wrap your checkpointer in a context manager
+@contextmanager
+def get_checkpointer_cm():
+    from langgraph.checkpoint.sqlite import SqliteSaver
+    yield SqliteSaver.from_conn_string(...)
+
+core = ExosuitCore(graph=build_graph(), checkpointer_cm=get_checkpointer_cm())
 
 # Run
 result = core.run({"value": "start"}, thread_id="thread-1")

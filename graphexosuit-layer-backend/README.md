@@ -5,7 +5,7 @@ FastAPI backend for [graphexosuit](https://github.com/graphexosuit/graphexosuit)
 ## Overview
 
 `graphexosuit-layer-backend` exposes a production-ready REST API around `graphexosuit.core`.
-Clients inject a `Liner` instance at construction time; the backend handles parameter
+Clients inject a compiled LangGraph and checkpointer context manager at construction time; the backend handles parameter
 parsing, serialization, error mapping, and logging.
 
 ## Endpoints
@@ -22,15 +22,20 @@ All endpoints use a **polling model** with background workers. POST endpoints re
 ## Quick Start
 
 ```python
-from my_app.workflows import DocumentWorkflow
+from my_app.workflows import build_graph
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.stores import InMemoryStore
 from graphexosuit.layer.backend import create_app
+from contextlib import contextmanager
 import uvicorn
 
-liner = DocumentWorkflow(checkpointer=MemorySaver())
+@contextmanager
+def get_checkpointer_cm():
+    yield MemorySaver()
+
+graph = build_graph()
 execution_data_store = InMemoryStore()
-app = create_app(liner=liner, execution_data_store=execution_data_store)
+app = create_app(graph=graph, checkpointer_cm=get_checkpointer_cm(), execution_data_store=execution_data_store)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

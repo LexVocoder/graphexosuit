@@ -1,7 +1,7 @@
 """graphexosuit.layer.backend.main - Async FastAPI application factory for graphexosuit.
 
 Responsibilities:
-  - Expose ``create_app(liner, execution_data_store)`` factory that wires a Liner and BaseStore
+  - Expose ``create_app(graph, checkpointer_cm, execution_data_store)`` factory that wires a graph and checkpointer
     into an async FastAPI app with background workers and polling-based result retrieval.
   - Define four REST endpoints: POST /run, GET /thread/{thread_id},
     POST /thread/{thread_id}/checkpoint/{checkpoint_id}/resume,
