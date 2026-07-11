@@ -15,21 +15,28 @@ from langgraph.types import interrupt
 
 from graphexosuit.core import InterruptOption, StandardizedInterrupt
 
-# Graph nodes
 
-def initialize(state):
+# ## Graph state
+
+class SimpleState(TypedDict):
+    value: Any
+
+
+# ## Graph nodes
+
+def node_initialize(state):
     """Standard initialization node that ensures entire initial state is both valid and captured in the first checkpoint, making it available for resuming and retrying even if the graph fails or is interrupted immediately thereafter."""
 
-    print("Initializing graph...")
+    print(f"Executing {node_initialize.__name__}...")
 
     if not state or "value" not in state:
         raise KeyError(f"Initial state must have 'value' key; got {repr(state)}")
 
     return state
 
-def node(state):
+def node_interrupt(state):
 
-    print("Executing node...")
+    print(f"Executing {node_interrupt.__name__}...")
 
     if state["value"] == "fail":
         raise ValueError("state['value'] was 'fail'")
@@ -46,9 +53,7 @@ def node(state):
     return {"value": post_interrupt_data}
 
 
-class SimpleState(TypedDict):
-    value: Any
-
+# ## Noteworthy exports
 
 def get_checkpointer_cm() -> Any:
     """Return a context manager that yields a SqliteSaver checkpointer."""
@@ -68,11 +73,11 @@ def get_checkpointer_cm() -> Any:
 def build_graph() -> StateGraph:
     """Return an uncompiled StateGraph for the interrupt sample."""
     builder = StateGraph(SimpleState)
-    builder.add_node("initialize", initialize)
-    builder.add_node("node", node)
+    builder.add_node(node_initialize.__name__, node_initialize)
+    builder.add_node(node_interrupt.__name__, node_interrupt)
 
-    builder.set_entry_point("initialize")
-    builder.add_edge("initialize", "node")
-    builder.set_finish_point("node")
+    builder.set_entry_point(node_initialize.__name__)
+    builder.add_edge(node_initialize.__name__, node_interrupt.__name__)
+    builder.set_finish_point(node_interrupt.__name__)
     return builder
 
