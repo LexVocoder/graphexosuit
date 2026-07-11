@@ -1,8 +1,9 @@
 import uvicorn
-from liner import build_graph, get_checkpointer_cm
 from fastapi.staticfiles import StaticFiles
 from graphexosuit.layer.backend import create_app
 from langchain_classic.storage import LocalFileStore
+
+from interrupt import build_graph, get_checkpointer_cm
 
 execution_data_store = LocalFileStore(".cache/graphexosuit-samples-interrupt/execution_data_store")
 

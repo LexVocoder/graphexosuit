@@ -1,5 +1,6 @@
 from graphexosuit.layer.cli import CliApp
-from liner import build_graph, get_checkpointer_cm
+
+from interrupt import build_graph, get_checkpointer_cm
 
 
 if __name__ == "__main__":
