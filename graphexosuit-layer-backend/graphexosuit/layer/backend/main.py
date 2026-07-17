@@ -22,7 +22,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, APIRouter
 from fastapi.responses import JSONResponse
 from langchain_core.stores import BaseStore
 from urllib.parse import quote
@@ -84,6 +84,9 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
         description="Async REST API for LangGraph graph execution via graphexosuit.core.",
     )
     
+    # ## Create router with /api/v1 prefix
+    router = APIRouter(prefix="/api/v1")
+    
     # ## Initialize the batch key-value store for thread execution data
     execution_batch_store = BatchKeyValueStore(execution_data_store)
     
@@ -96,7 +99,7 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
         Returns:
             A poll URL string with properly encoded thread_id.
         """
-        return f"/thread/{quote(thread_id, safe='')}"
+        return f"/api/v1/thread/{quote(thread_id, safe='')}"
     
     def _init_thread_execution_data(thread_id: str) -> None:
         """Initialize thread execution data for a thread if it doesn't already exist (idempotent).
@@ -252,7 +255,7 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
     
     # ## Define the four endpoints
     
-    @fastapi_app.post("/run")
+    @router.post("/run")
     async def run_endpoint(
         body: dict = Body(...),
     ) -> JSONResponse:
@@ -293,7 +296,7 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
             },
         )
     
-    @fastapi_app.get("/thread/{thread_id}")
+    @router.get("/thread/{thread_id}")
     async def get_thread_endpoint(thread_id: str) -> JSONResponse:
         """GET /thread/{thread_id} endpoint: Poll execution status and results.
         
@@ -324,7 +327,7 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
             },
         )
     
-    @fastapi_app.post("/thread/{thread_id}/checkpoint/{checkpoint_id}/resume")
+    @router.post("/thread/{thread_id}/checkpoint/{checkpoint_id}/resume")
     async def resume_endpoint(
         thread_id: str,
         checkpoint_id: str,
@@ -372,7 +375,7 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
             },
         )
     
-    @fastapi_app.post("/thread/{thread_id}/checkpoint/{checkpoint_id}/retry")
+    @router.post("/thread/{thread_id}/checkpoint/{checkpoint_id}/retry")
     async def retry_endpoint(
         thread_id: str,
         checkpoint_id: str,
@@ -417,6 +420,9 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
                 "poll_url": poll_url,
             },
         )
+    
+    # ## Include router with /api/v1 prefix
+    fastapi_app.include_router(router)
 
     return fastapi_app
 

@@ -265,23 +265,23 @@ class TestRunEndpoint:
     def test_run_returns_202_with_thread_id_and_poll_url(self) -> None:
         """POST /run must return 202 with thread_id and poll_url."""
         client = _make_client()
-        response = client.post("/run", json={"initial_state": {"value": "hello"}})
+        response = client.post("/api/v1/run", json={"initial_state": {"value": "hello"}})
         assert response.status_code == 202
         data = response.json()
         assert "thread_id" in data
         assert "poll_url" in data
-        assert data["poll_url"].startswith("/thread/")
+        assert data["poll_url"].startswith("/api/v1/thread/")
 
     def test_run_background_execution_completes(self) -> None:
         """After POST /run, the background worker should eventually complete the execution."""
         client = _make_client()
-        response = client.post("/run", json={"initial_state": {"value": "hello"}})
+        response = client.post("/api/v1/run", json={"initial_state": {"value": "hello"}})
         assert response.status_code == 202
         thread_id = response.json()["thread_id"]
         
         # Poll until execution completes (with a timeout)
         for _ in range(20):
-            poll_response = client.get(f"/thread/{thread_id}")
+            poll_response = client.get(f"/api/v1/thread/{thread_id}")
             if poll_response.status_code == 200:
                 poll_data = poll_response.json()
                 if poll_data.get("status") == "completed":
@@ -304,7 +304,7 @@ class TestGetThreadEndpoint:
     def test_get_thread_returns_404_for_nonexistent_thread(self) -> None:
         """GET /thread/{thread_id} must return 404 for nonexistent threads."""
         client = _make_client()
-        response = client.get("/thread/nonexistent-thread-id")
+        response = client.get("/api/v1/thread/nonexistent-thread-id")
         assert response.status_code == 404
         data = response.json()
         assert "error" in data
@@ -312,12 +312,12 @@ class TestGetThreadEndpoint:
     def test_get_thread_returns_execution_data_after_completion(self) -> None:
         """GET /thread/{thread_id} must return execution data with all required fields."""
         client = _make_client()
-        run_response = client.post("/run", json={"initial_state": {"value": "hello"}})
+        run_response = client.post("/api/v1/run", json={"initial_state": {"value": "hello"}})
         thread_id = run_response.json()["thread_id"]
         
         # Wait for completion
         for _ in range(20):
-            poll_response = client.get(f"/thread/{thread_id}")
+            poll_response = client.get(f"/api/v1/thread/{thread_id}")
             if poll_response.status_code == 200:
                 data = poll_response.json()
                 if data.get("status") == "completed":
@@ -344,12 +344,12 @@ class TestResumeEndpointAsync:
         client = _make_client()
         
         # First, trigger an interrupt
-        run_response = client.post("/run", json={"initial_state": {"value": "interrupt_me"}})
+        run_response = client.post("/api/v1/run", json={"initial_state": {"value": "interrupt_me"}})
         thread_id = run_response.json()["thread_id"]
         
         # Wait for interrupt to occur
         for _ in range(20):
-            poll_response = client.get(f"/thread/{thread_id}")
+            poll_response = client.get(f"/api/v1/thread/{thread_id}")
             if poll_response.status_code == 200:
                 poll_data = poll_response.json()
                 if poll_data.get("status") == "paused":
@@ -359,7 +359,7 @@ class TestResumeEndpointAsync:
                         
                         # Now resume
                         resume_response = client.post(
-                            f"/thread/{thread_id}/checkpoint/{checkpoint_id}/resume",
+                            f"/api/v1/thread/{thread_id}/checkpoint/{checkpoint_id}/resume",
                             json={"strategy": "default"}
                         )
                         assert resume_response.status_code == 202
@@ -375,7 +375,7 @@ class TestResumeEndpointAsync:
         """POST /resume on nonexistent thread must return 404."""
         client = _make_client()
         response = client.post(
-            "/thread/nonexistent/checkpoint/ckpt/resume",
+            "/api/v1/thread/nonexistent/checkpoint/ckpt/resume",
             json={"strategy": "default"}
         )
         assert response.status_code == 404
@@ -392,12 +392,12 @@ class TestRetryEndpointAsync:
         client = _make_client()
         
         # Trigger a failure
-        run_response = client.post("/run", json={"initial_state": {"value": "fail_me"}})
+        run_response = client.post("/api/v1/run", json={"initial_state": {"value": "fail_me"}})
         thread_id = run_response.json()["thread_id"]
         
         # Wait for error to occur
         for _ in range(20):
-            poll_response = client.get(f"/thread/{thread_id}")
+            poll_response = client.get(f"/api/v1/thread/{thread_id}")
             if poll_response.status_code == 200:
                 poll_data = poll_response.json()
                 if poll_data.get("status") == "error":
@@ -407,7 +407,7 @@ class TestRetryEndpointAsync:
                         
                         # Now retry
                         retry_response = client.post(
-                            f"/thread/{thread_id}/checkpoint/{checkpoint_id}/retry"
+                            f"/api/v1/thread/{thread_id}/checkpoint/{checkpoint_id}/retry"
                         )
                         assert retry_response.status_code == 202
                         retry_data = retry_response.json()
@@ -421,6 +421,6 @@ class TestRetryEndpointAsync:
     def test_retry_returns_404_for_nonexistent_thread(self) -> None:
         """POST /retry on nonexistent thread must return 404."""
         client = _make_client()
-        response = client.post("/thread/nonexistent/checkpoint/ckpt/retry")
+        response = client.post("/api/v1/thread/nonexistent/checkpoint/ckpt/retry")
         assert response.status_code == 404
 
