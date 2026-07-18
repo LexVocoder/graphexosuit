@@ -11,6 +11,8 @@ app = create_app(
     graph=build_graph(),
     checkpointer_cm=get_checkpointer_cm(),
     execution_data_store=execution_data_store,
+    workflow_name="Interrupted Workflow",
+    sample_initial_state={"value": 1}
 )
 
 app.mount("/", StaticFiles(directory="/home/micro/repos/trusted/graphexosuit-webfrontend/dist", html=True), name="frontend")
