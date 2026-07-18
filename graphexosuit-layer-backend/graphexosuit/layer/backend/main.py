@@ -1,20 +1,23 @@
 """graphexosuit.layer.backend.main - Async FastAPI application factory for graphexosuit.
 
 Responsibilities:
-  - Expose ``create_app(graph, checkpointer_cm, execution_data_store)`` factory that wires a graph and checkpointer
-    into an async FastAPI app with background workers and polling-based result retrieval.
-  - Define four REST endpoints: POST /run, GET /thread/{thread_id},
+  - Expose ``create_app(graph, checkpointer_cm, execution_data_store, workflow_name, sample_initial_state)`` factory
+    that wires a graph and checkpointer into an async FastAPI app with background workers and polling-based result retrieval.
+  - Define five REST endpoints: POST /run, GET /thread/{thread_id},
     POST /thread/{thread_id}/checkpoint/{checkpoint_id}/resume,
-    POST /thread/{thread_id}/checkpoint/{checkpoint_id}/retry.
+    POST /thread/{thread_id}/checkpoint/{checkpoint_id}/retry,
+    GET /config.
   - Spawn background worker threads to execute graph operations asynchronously.
   - Capture stdout/stderr from background graph executions and persist to execution data store.
   - Handle GraphExecutionError and ThreadNotFound in background workers; surface via execution data.
   - Provide polling interface (GET /thread/{thread_id}) for clients to retrieve results and status.
+  - Expose configuration endpoint (GET /config) returning workflow_name and sample_initial_state.
 """
 
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import threading
 import uuid
@@ -48,11 +51,18 @@ logger = logging.getLogger(__name__)
 
 
 
-def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseStore) -> FastAPI:
+def create_app(
+    *,
+    graph: Any,
+    checkpointer_cm: Any,
+    execution_data_store: BaseStore,
+    workflow_name: str,
+    sample_initial_state: Any,
+) -> FastAPI:
     """Create and return a FastAPI application for graphexosuit-layer-restservice.
 
     Instantiates ExosuitCore with the provided graph and checkpointer context manager,
-    then creates a FastAPI app with four endpoints that manage async graph execution
+    then creates a FastAPI app with five endpoints that manage async graph execution
     via background worker threads.  All POST endpoints spawn background workers and
     return 202 immediately with thread_id and poll_url.  The GET /thread/{thread_id}
     endpoint returns thread execution data including status, result, error, and captured
@@ -67,14 +77,31 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
         graph: A compiled or uncompiled LangGraph StateGraph.
         checkpointer_cm: A context manager that yields a checkpointer instance.
         execution_data_store: A langchain_core.stores.BaseStore for persisting thread execution data.
+        workflow_name: Name of the workflow; returned by the GET /config endpoint.
+        sample_initial_state: A JSON-serializable initial state example; returned by the GET /config endpoint.
+            Must be serializable via json.dumps() or ValueError is raised.
 
     Returns:
-        A configured FastAPI application with four endpoints:
+        A configured FastAPI application with five endpoints:
         - POST /run: Start a new graph execution
         - GET /thread/{thread_id}: Poll execution status and results
         - POST /thread/{thread_id}/checkpoint/{checkpoint_id}/resume: Resume paused execution
         - POST /thread/{thread_id}/checkpoint/{checkpoint_id}/retry: Retry failed execution
+        - GET /config: Return workflow_name and sample_initial_state
+
+    Raises:
+        ValueError: If sample_initial_state is not JSON-serializable.
     """
+    # ## Validate that sample_initial_state is JSON-serializable
+    # Fail early if the caller provided an invalid value; this ensures the config endpoint
+    # will always be able to serialize it without runtime errors.
+    try:
+        json.dumps(sample_initial_state)
+    except (TypeError, ValueError) as exn:
+        raise ValueError(
+            f"sample_initial_state must be JSON-serializable, got {type(sample_initial_state).__name__}: {exn}"
+        ) from exn
+
     # ## Instantiate ExosuitCore with the graph and checkpointer
     core = ExosuitCore(graph=graph, checkpointer_cm=checkpointer_cm)
     
@@ -418,6 +445,25 @@ def create_app(*, graph: Any, checkpointer_cm: Any, execution_data_store: BaseSt
             content={
                 "thread_id": thread_id,
                 "poll_url": poll_url,
+            },
+        )
+    
+    @router.get("/config")
+    async def config_endpoint() -> JSONResponse:
+        """GET /config endpoint: Return workflow configuration.
+        
+        Returns the workflow_name and sample_initial_state that were provided
+        to create_app(). These values are immutable for the lifetime of the app
+        and are useful for webfrontend to discover configuration at runtime.
+        
+        Returns:
+            200 OK: {workflow_name, sample_initial_state}
+        """
+        return JSONResponse(
+            status_code=200,
+            content={
+                "workflow_name": workflow_name,
+                "sample_initial_state": sample_initial_state,
             },
         )
     

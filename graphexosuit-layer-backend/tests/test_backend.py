@@ -109,13 +109,30 @@ def _get_checkpointer() -> Any:
     return _shared_checkpointer
 
 
-def _make_client() -> TestClient:
-    """Create a fresh TestClient backed by a new async app with in-memory execution data store."""
+def _make_client(
+    *,
+    workflow_name: str = "test_workflow",
+    sample_initial_state: dict = None,
+) -> TestClient:
+    """Create a fresh TestClient backed by a new async app with in-memory execution data store.
+    
+    Args:
+        workflow_name: Workflow name to pass to create_app; defaults to "test_workflow".
+        sample_initial_state: Sample initial state to pass to create_app; defaults to an empty dict.
+    
+    Returns:
+        A TestClient with a freshly configured app.
+    """
+    if sample_initial_state is None:
+        sample_initial_state = {}
+    
     execution_data_store = _InMemoryExecutionDataStore()
     app = create_app(
         graph=_get_graph(),
         checkpointer_cm=_CheckpointerCM(_get_checkpointer()),
         execution_data_store=execution_data_store,
+        workflow_name=workflow_name,
+        sample_initial_state=sample_initial_state,
     )
     return TestClient(app, raise_server_exceptions=False)
 
@@ -423,4 +440,89 @@ class TestRetryEndpointAsync:
         client = _make_client()
         response = client.post("/api/v1/thread/nonexistent/checkpoint/ckpt/retry")
         assert response.status_code == 404
+
+
+# ===========================================================================
+# Unit tests: config endpoint
+# ===========================================================================
+
+class TestConfigEndpoint:
+    """Tests for the GET /config endpoint."""
+    
+    def test_config_returns_200_with_default_values(self) -> None:
+        """GET /config must return 200 with default workflow_name and empty sample_initial_state."""
+        client = _make_client()
+        response = client.get("/api/v1/config")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["workflow_name"] == "test_workflow"
+        assert data["sample_initial_state"] == {}
+    
+    def test_config_returns_custom_workflow_name(self) -> None:
+        """GET /config must return the workflow_name that was passed to create_app."""
+        client = _make_client(workflow_name="my_custom_workflow")
+        response = client.get("/api/v1/config")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["workflow_name"] == "my_custom_workflow"
+    
+    def test_config_returns_custom_sample_initial_state(self) -> None:
+        """GET /config must return the sample_initial_state that was passed to create_app."""
+        sample_state = {"user_id": 42, "name": "Alice", "nested": {"key": "value"}}
+        client = _make_client(sample_initial_state=sample_state)
+        response = client.get("/api/v1/config")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sample_initial_state"] == sample_state
+    
+    def test_config_returns_complex_sample_initial_state(self) -> None:
+        """GET /config must serialize complex JSON structures correctly."""
+        sample_state = {
+            "items": [1, 2, 3],
+            "metadata": {"count": 3, "active": True, "ratio": 0.5},
+            "empty_list": [],
+            "null_value": None,
+        }
+        client = _make_client(sample_initial_state=sample_state)
+        response = client.get("/api/v1/config")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["sample_initial_state"] == sample_state
+
+
+# ===========================================================================
+# Unit tests: create_app validation
+# ===========================================================================
+
+class TestCreateAppValidation:
+    """Tests for create_app parameter validation."""
+    
+    def test_create_app_raises_on_non_json_serializable_sample_initial_state(self) -> None:
+        """create_app() must raise ValueError if sample_initial_state is not JSON-serializable."""
+        # Functions and lambdas are not JSON-serializable
+        with pytest.raises(ValueError, match="sample_initial_state must be JSON-serializable"):
+            _make_client(sample_initial_state=lambda x: x)
+    
+    def test_create_app_raises_on_custom_non_serializable_object(self) -> None:
+        """create_app() must raise ValueError for custom non-serializable objects."""
+        class NonSerializable:
+            pass
+        
+        with pytest.raises(ValueError, match="sample_initial_state must be JSON-serializable"):
+            _make_client(sample_initial_state=NonSerializable())
+    
+    def test_create_app_raises_with_helpful_error_message(self) -> None:
+        """ValueError from create_app must include the type of the invalid value."""
+        def my_func() -> None:
+            pass
+        
+        with pytest.raises(ValueError) as exc_info:
+            _make_client(sample_initial_state=my_func)
+        
+        error_msg = str(exc_info.value)
+        assert "function" in error_msg  # The error message should mention the type
 
