@@ -15,14 +15,12 @@ from graphexosuit.core.errors import (
     GraphExecutionError,
     ThreadNotFound,
 )
-from graphexosuit.core.liner import ExosuitLiner
 
 __all__ = [
     "ExosuitCore",
     "InterruptOption",
     "StandardizedInterrupt",
     "RunResult",
-    "ExosuitLiner",
     "GraphLoaderError",
     "InvalidInterruptError",
     "GraphExecutionError",
